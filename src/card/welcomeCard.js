@@ -94,30 +94,110 @@ function drawBackground(ctx) {
   ctx.stroke();
 }
 
-// Crescent: draw a full moon on its own canvas, then erase a circle out of it
-// (destination-out) so the background shows through the bite.
-function drawMoon(ctx, faded) {
-  const r = 50;
-  const pad = 60;
-  const size = (r + pad) * 2;
+// Seeded RNG so every card gets the exact same moon surface.
+function mulberry32(seed) {
+  return () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Soft-edged blob: a radial gradient that fades to transparent.
+function blob(m, x, y, r, rgb, alpha) {
+  const g = m.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(${rgb}, ${alpha})`);
+  g.addColorStop(0.6, `rgba(${rgb}, ${alpha * 0.7})`);
+  g.addColorStop(1, `rgba(${rgb}, 0)`);
+  m.fillStyle = g;
+  m.beginPath();
+  m.arc(x, y, r, 0, Math.PI * 2);
+  m.fill();
+}
+
+// Maria (dark "seas"), as [x, y, radius] in units of the moon radius,
+// loosely following the near side of the real moon.
+const MARIA = [
+  [-0.35, -0.35, 0.38], [-0.05, -0.45, 0.3], [0.3, -0.3, 0.26], [0.42, 0.05, 0.22],
+  [-0.45, 0.1, 0.34], [-0.15, 0.05, 0.28], [0.1, 0.3, 0.2], [-0.3, 0.45, 0.18],
+];
+
+function renderMoonSurface(r) {
+  const size = r * 2;
   const c = createCanvas(size, size);
   const m = c.getContext('2d');
-  const cx = size / 2;
+  const rand = mulberry32(7);
+  const px = (u) => r + u * r;
 
-  m.fillStyle = C.moon;
   m.beginPath();
-  m.arc(cx, cx, r, 0, Math.PI * 2);
-  m.fill();
-  m.globalCompositeOperation = 'destination-out';
-  m.beginPath();
-  m.arc(cx - 28, cx + 16, r, 0, Math.PI * 2);
-  m.fill();
+  m.arc(r, r, r, 0, Math.PI * 2);
+  m.clip();
+
+  m.fillStyle = '#F3F1FF';
+  m.fillRect(0, 0, size, size);
+
+  for (const [x, y, s] of MARIA) blob(m, px(x), px(y), s * r, '78, 72, 120', 0.6);
+
+  // Fine grain so the surface isn't a flat fill.
+  for (let i = 0; i < size * 6; i++) {
+    m.fillStyle = rand() < 0.5 ? 'rgba(70, 64, 120, 0.10)' : 'rgba(255, 255, 255, 0.12)';
+    m.fillRect(rand() * size, rand() * size, 1.2, 1.2);
+  }
+
+  // Craters: dark bowl plus a lit rim on the lower-right (light from the upper-left).
+  for (let i = 0; i < 18; i++) {
+    const cr = r * (0.03 + rand() * rand() * 0.11);
+    const a = rand() * Math.PI * 2;
+    const d = Math.sqrt(rand()) * (r - cr * 1.5);
+    const x = r + Math.cos(a) * d;
+    const y = r + Math.sin(a) * d;
+    blob(m, x, y, cr, '70, 64, 115', 0.3);
+    m.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    m.lineWidth = Math.max(1, cr * 0.18);
+    m.beginPath();
+    m.arc(x, y, cr * 0.85, Math.PI * -0.1, Math.PI * 0.6);
+    m.stroke();
+  }
+
+  // A bright ray crater (like Tycho) for a focal point.
+  blob(m, px(-0.05), px(0.62), r * 0.09, '255, 255, 255', 0.8);
+
+  // Limb darkening: edges fall off toward purple, which also blends it into the palette.
+  const limb = m.createRadialGradient(r * 0.85, r * 0.8, r * 0.2, r, r, r);
+  limb.addColorStop(0, 'rgba(38, 33, 92, 0)');
+  limb.addColorStop(0.75, 'rgba(38, 33, 92, 0.15)');
+  limb.addColorStop(1, 'rgba(38, 33, 92, 0.5)');
+  m.fillStyle = limb;
+  m.fillRect(0, 0, size, size);
+
+  return c;
+}
+
+// Built once and reused, since the surface never changes.
+const MOON_R = 58;
+const moonSurface = renderMoonSurface(MOON_R);
+
+function drawMoon(ctx, faded) {
+  const x = W - 125;
+  const y = 100;
 
   ctx.save();
-  ctx.globalAlpha = faded ? 0.35 : 1;
+  ctx.globalAlpha = faded ? 0.3 : 1;
+
+  // Wide halo first, then the moon with a tight glow on top.
+  const halo = ctx.createRadialGradient(x, y, MOON_R * 0.9, x, y, MOON_R * 2.6);
+  halo.addColorStop(0, 'rgba(127, 119, 221, 0.22)');
+  halo.addColorStop(1, 'rgba(127, 119, 221, 0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(x, y, MOON_R * 2.6, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.shadowColor = C.moon;
-  ctx.shadowBlur = 30;
-  ctx.drawImage(c, W - 120 - cx, 92 - cx);
+  ctx.shadowBlur = 24;
+  if (faded) ctx.filter = 'grayscale(1)';
+  ctx.drawImage(moonSurface, x - MOON_R, y - MOON_R);
   ctx.restore();
 }
 
