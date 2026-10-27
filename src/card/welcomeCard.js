@@ -2,9 +2,9 @@ import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const FONT_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets/fonts');
-GlobalFonts.registerFromPath(path.join(FONT_DIR, 'Cinzel.ttf'), 'Cinzel');
-GlobalFonts.registerFromPath(path.join(FONT_DIR, 'Inter.ttf'), 'Inter');
+const ASSET_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets');
+GlobalFonts.registerFromPath(path.join(ASSET_DIR, 'fonts/Cinzel.ttf'), 'Cinzel');
+GlobalFonts.registerFromPath(path.join(ASSET_DIR, 'fonts/Inter.ttf'), 'Inter');
 
 const W = 1024;
 const H = 450;
@@ -94,89 +94,57 @@ function drawBackground(ctx) {
   ctx.stroke();
 }
 
-// Seeded RNG so every card gets the exact same moon surface.
-function mulberry32(seed) {
-  return () => {
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+// Real full-moon photo: NASA Scientific Visualization Studio (LRO data), public domain.
+// Find the disk in the photo, tint it, and cut it to a clean circle once at startup.
+async function loadMoon(size) {
+  const img = await loadImage(path.join(ASSET_DIR, 'moon.jpg'));
+  const src = createCanvas(img.width, img.height);
+  const s = src.getContext('2d');
+  s.drawImage(img, 0, 0);
+  const { data, width, height } = s.getImageData(0, 0, img.width, img.height);
 
-// Soft-edged blob: a radial gradient that fades to transparent.
-function blob(m, x, y, r, rgb, alpha) {
-  const g = m.createRadialGradient(x, y, 0, x, y, r);
-  g.addColorStop(0, `rgba(${rgb}, ${alpha})`);
-  g.addColorStop(0.6, `rgba(${rgb}, ${alpha * 0.7})`);
-  g.addColorStop(1, `rgba(${rgb}, 0)`);
-  m.fillStyle = g;
+  // Bounding box of every pixel brighter than the black sky = the moon's disk.
+  let minX = width, maxX = 0, minY = height, maxY = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (data[i] + data[i + 1] + data[i + 2] > 120) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  // Trim a hair off the edge so no dark sky fringe survives the mask.
+  const r = Math.max(maxX - minX, maxY - minY) / 2 - 2;
+
+  const out = createCanvas(size, size);
+  const m = out.getContext('2d');
+  m.imageSmoothingQuality = 'high';
+  // Lift exposure a touch so it reads as a glowing night moon, not a grey rock.
+  m.filter = 'brightness(1.1)';
+  m.drawImage(img, cx - r, cy - r, r * 2, r * 2, 0, 0, size, size);
+  m.filter = 'none';
+
+  // Faint lavender wash so the grey moon belongs to the purple palette.
+  m.globalCompositeOperation = 'multiply';
+  m.fillStyle = '#E6E2FF';
+  m.fillRect(0, 0, size, size);
+
+  // Anti-aliased circular cut-out.
+  m.globalCompositeOperation = 'destination-in';
   m.beginPath();
-  m.arc(x, y, r, 0, Math.PI * 2);
+  m.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
   m.fill();
+
+  return out;
 }
 
-// Maria (dark "seas"), as [x, y, radius] in units of the moon radius,
-// loosely following the near side of the real moon.
-const MARIA = [
-  [-0.35, -0.35, 0.38], [-0.05, -0.45, 0.3], [0.3, -0.3, 0.26], [0.42, 0.05, 0.22],
-  [-0.45, 0.1, 0.34], [-0.15, 0.05, 0.28], [0.1, 0.3, 0.2], [-0.3, 0.45, 0.18],
-];
-
-function renderMoonSurface(r) {
-  const size = r * 2;
-  const c = createCanvas(size, size);
-  const m = c.getContext('2d');
-  const rand = mulberry32(7);
-  const px = (u) => r + u * r;
-
-  m.beginPath();
-  m.arc(r, r, r, 0, Math.PI * 2);
-  m.clip();
-
-  m.fillStyle = '#F3F1FF';
-  m.fillRect(0, 0, size, size);
-
-  for (const [x, y, s] of MARIA) blob(m, px(x), px(y), s * r, '78, 72, 120', 0.6);
-
-  // Fine grain so the surface isn't a flat fill.
-  for (let i = 0; i < size * 6; i++) {
-    m.fillStyle = rand() < 0.5 ? 'rgba(70, 64, 120, 0.10)' : 'rgba(255, 255, 255, 0.12)';
-    m.fillRect(rand() * size, rand() * size, 1.2, 1.2);
-  }
-
-  // Craters: dark bowl plus a lit rim on the lower-right (light from the upper-left).
-  for (let i = 0; i < 18; i++) {
-    const cr = r * (0.03 + rand() * rand() * 0.11);
-    const a = rand() * Math.PI * 2;
-    const d = Math.sqrt(rand()) * (r - cr * 1.5);
-    const x = r + Math.cos(a) * d;
-    const y = r + Math.sin(a) * d;
-    blob(m, x, y, cr, '70, 64, 115', 0.3);
-    m.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-    m.lineWidth = Math.max(1, cr * 0.18);
-    m.beginPath();
-    m.arc(x, y, cr * 0.85, Math.PI * -0.1, Math.PI * 0.6);
-    m.stroke();
-  }
-
-  // A bright ray crater (like Tycho) for a focal point.
-  blob(m, px(-0.05), px(0.62), r * 0.09, '255, 255, 255', 0.8);
-
-  // Limb darkening: edges fall off toward purple, which also blends it into the palette.
-  const limb = m.createRadialGradient(r * 0.85, r * 0.8, r * 0.2, r, r, r);
-  limb.addColorStop(0, 'rgba(38, 33, 92, 0)');
-  limb.addColorStop(0.75, 'rgba(38, 33, 92, 0.15)');
-  limb.addColorStop(1, 'rgba(38, 33, 92, 0.5)');
-  m.fillStyle = limb;
-  m.fillRect(0, 0, size, size);
-
-  return c;
-}
-
-// Built once and reused, since the surface never changes.
-const MOON_R = 58;
-const moonSurface = renderMoonSurface(MOON_R);
+const MOON_R = 66;
+const moonImage = await loadMoon(MOON_R * 2);
 
 function drawMoon(ctx, faded) {
   const x = W - 125;
@@ -197,7 +165,7 @@ function drawMoon(ctx, faded) {
   ctx.shadowColor = C.moon;
   ctx.shadowBlur = 24;
   if (faded) ctx.filter = 'grayscale(1)';
-  ctx.drawImage(moonSurface, x - MOON_R, y - MOON_R);
+  ctx.drawImage(moonImage, x - MOON_R, y - MOON_R);
   ctx.restore();
 }
 
