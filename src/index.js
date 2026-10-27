@@ -53,4 +53,17 @@ client.once(Events.ClientReady, async (c) => {
   }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN).catch((err) => {
+  if (err.message.includes('disallowed intents')) {
+    console.error(
+      'Discord refused the connection: "Server Members Intent" is off for this bot.\n' +
+        'Fix: discord.com/developers/applications → your app → Bot → Privileged Gateway Intents →\n' +
+        'turn on SERVER MEMBERS INTENT → click "Save Changes" at the bottom, then start the bot again.',
+    );
+  } else if (err.code === 'TokenInvalid') {
+    console.error('Discord rejected the token. Reset it in the Developer Portal (Bot → Reset Token) and update .env.');
+  } else {
+    console.error('Login failed:', err);
+  }
+  process.exit(1);
+});
