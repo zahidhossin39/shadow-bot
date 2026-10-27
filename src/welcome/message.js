@@ -4,11 +4,28 @@ import { renderWelcomeCard } from '../card/welcomeCard.js';
 
 export const config = JSON.parse(readFileSync(new URL('../../config.json', import.meta.url), 'utf8'));
 
-// Config values can be a channel ID or a channel name, so renaming a channel only needs a config edit.
+// Small-caps letters the server uses in channel names (ᴡᴇʟᴄᴏᴍᴇ), mapped back to plain ASCII.
+const SMALL_CAPS = {
+  ᴀ: 'a', ʙ: 'b', ᴄ: 'c', ᴅ: 'd', ᴇ: 'e', ꜰ: 'f', ɢ: 'g', ʜ: 'h', ɪ: 'i', ᴊ: 'j', ᴋ: 'k', ʟ: 'l', ᴍ: 'm',
+  ɴ: 'n', ᴏ: 'o', ᴘ: 'p', ǫ: 'q', ʀ: 'r', ꜱ: 's', ᴛ: 't', ᴜ: 'u', ᴠ: 'v', ᴡ: 'w', ʏ: 'y', ᴢ: 'z',
+};
+
+// "👋・ᴡᴇʟᴄᴏᴍᴇ-ᴛᴏ-sʜᴀᴅᴏᴡ-ɢʀᴀᴅᴇɴ" → "welcome-to-shadow-graden", so config can use plain names.
+export function normalizeName(name) {
+  return [...name]
+    .map((ch) => SMALL_CAPS[ch] ?? ch)
+    .join('')
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/^-+|-+$/g, '');
+}
+
+// Config values can be a channel ID or a plain channel name, so renaming a channel only needs a config edit.
 export function findChannel(guild, ref) {
   if (!ref) return null;
   if (/^\d+$/.test(ref)) return guild.channels.cache.get(ref) ?? null;
-  return guild.channels.cache.find((c) => c.name === ref) ?? null;
+  const target = normalizeName(ref);
+  return guild.channels.cache.find((c) => c.isTextBased?.() !== false && normalizeName(c.name) === target) ?? null;
 }
 
 // Clickable #channel mention if it exists, plain text otherwise.

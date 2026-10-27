@@ -40,7 +40,8 @@ client.once(Events.ClientReady, async (c) => {
 
     const channel = findChannel(guild, config.channels.welcome);
     if (!channel) {
-      console.warn(`[${guild.name}] welcome channel "${config.channels.welcome}" not found`);
+      const names = guild.channels.cache.filter((ch) => ch.isTextBased()).map((ch) => ch.name);
+      console.warn(`[${guild.name}] welcome channel "${config.channels.welcome}" not found. Text channels: ${names.join(', ')}`);
       continue;
     }
     const needed = ['ViewChannel', 'SendMessages', 'EmbedLinks', 'AttachFiles'];
