@@ -28,7 +28,7 @@ const TEXT_X = 420;
 const TEXT_MAX = W - TEXT_X - 56;
 
 // Fetch ourselves so a dead URL falls back to an initial instead of throwing.
-export async function loadAvatar(url) {
+async function loadAvatar(url) {
   if (!url) return null;
   try {
     const res = await fetch(url);
@@ -40,7 +40,7 @@ export async function loadAvatar(url) {
 }
 
 // Shrink the font until the text fits, then truncate with an ellipsis as a last resort.
-export function fitText(ctx, text, { family, size, minSize, maxWidth, weight = '' }) {
+function fitText(ctx, text, { family, size, minSize, maxWidth, weight = '' }) {
   let s = size;
   ctx.font = `${weight} ${s}px ${family}`.trim();
   while (ctx.measureText(text).width > maxWidth && s > minSize) {
@@ -96,7 +96,7 @@ function drawBackground(ctx) {
 
 // Real full-moon photo: NASA Scientific Visualization Studio (LRO data), public domain.
 // Find the disk in the photo, tint it, and cut it to a clean circle once at startup.
-export async function loadMoon(size) {
+async function loadMoon(size) {
   const img = await loadImage(path.join(ASSET_DIR, 'moon.jpg'));
   const src = createCanvas(img.width, img.height);
   const s = src.getContext('2d');
