@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "preview": "node scripts/preview.js"
+    "preview": "node scripts/preview.js",
+    "start": "node src/index.js",
+    "test-message": "node scripts/test-message.js"
   },
   "keywords": [],
   "author": "",
