@@ -4,7 +4,7 @@ import * as memberAdd from './events/memberAdd.js';
 import * as memberRemove from './events/memberRemove.js';
 import * as welcomeTest from './commands/welcomeTest.js';
 import { handleWelcomeInteraction } from './welcome/interactions.js';
-import { config, findChannel, findRole } from './welcome/message.js';
+import { config, findChannel } from './welcome/message.js';
 
 if (!process.env.DISCORD_TOKEN) {
   console.error('Missing DISCORD_TOKEN. Create a file named .env in the Shadow-Bot folder with:\nDISCORD_TOKEN=your-bot-token');
@@ -47,16 +47,6 @@ client.once(Events.ClientReady, async (c) => {
     // Guild commands show up instantly; global ones can take up to an hour.
     await guild.commands.set(body);
     console.log(`[${guild.name}] registered: ${body.map((b) => '/' + b.name).join(', ')}`);
-
-    // Role picker: report missing roles and roles the bot is too low to hand out.
-    const me = guild.members.me;
-    const roleNotes = config.interestRoles.map(({ role }) => {
-      const r = findRole(guild, role);
-      if (!r) return `${role}: NOT FOUND`;
-      return r.position >= me.roles.highest.position ? `${r.name}: bot role is BELOW it` : `${r.name}: ok`;
-    });
-    const canManage = me.permissions.has(PermissionFlagsBits.ManageRoles);
-    console.log(`[${guild.name}] role picker: ${roleNotes.join(', ')}${canManage ? '' : ' (bot is MISSING Manage Roles)'}`);
 
     const channel = findChannel(guild, config.channels.welcome);
     if (!channel) {

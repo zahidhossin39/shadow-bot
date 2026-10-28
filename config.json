@@ -8,11 +8,6 @@
   },
   "color": "#7F77DD",
   "goodbyeColor": "#4A4766",
-  "interestRoles": [
-    { "role": "AI", "emoji": "🤖", "description": "AI tools, prompts and news" },
-    { "role": "Design", "emoji": "🎨", "description": "Design assets and feedback" },
-    { "role": "Memes", "emoji": "👀", "description": "Memes and off-topic fun" }
-  ],
   "rules": [
     "Respect every shadow. No harassment, hate or personal attacks.",
     "No spam, self-promo or DM advertising without permission.",

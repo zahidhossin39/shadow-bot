@@ -28,14 +28,6 @@ export function findChannel(guild, ref) {
   return guild.channels.cache.find((c) => c.isTextBased?.() !== false && normalizeName(c.name) === target) ?? null;
 }
 
-// Same idea for roles: config uses plain names ("AI"), the server may style them.
-export function findRole(guild, ref) {
-  if (!ref) return null;
-  if (/^\d+$/.test(ref)) return guild.roles.cache.get(ref) ?? null;
-  const target = normalizeName(ref);
-  return guild.roles.cache.find((r) => normalizeName(r.name) === target) ?? null;
-}
-
 // Clickable #channel mention if it exists, plain text otherwise.
 export function channelMention(guild, ref) {
   const ch = findChannel(guild, ref);
@@ -119,7 +111,6 @@ export function welcomeButtons(memberId, count) {
       .setLabel(`Welcome them (${count})`)
       .setEmoji('👋')
       .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('roles:open').setLabel('Pick roles').setEmoji('🎭').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('rules:show').setLabel('Rules').setEmoji('📜').setStyle(ButtonStyle.Secondary),
   );
 }
