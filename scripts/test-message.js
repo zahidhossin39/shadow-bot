@@ -1,6 +1,6 @@
 // Offline check: build the full welcome message from a fake member, no Discord login needed.
 import { Collection } from 'discord.js';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { buildWelcomeMessage } from '../src/welcome/message.js';
 
 const channels = new Collection([
@@ -22,4 +22,5 @@ const msg = await buildWelcomeMessage(member);
 console.log('content:', msg.content);
 console.log('embed:', JSON.stringify(msg.embeds[0].toJSON(), null, 2));
 console.log('file:', msg.files[0].name);
+await mkdir(new URL('../preview/', import.meta.url), { recursive: true });
 await writeFile(new URL('../preview/message-card.png', import.meta.url), msg.files[0].attachment);
