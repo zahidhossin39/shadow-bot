@@ -40,4 +40,11 @@ if (autoUpdate && existsSync(ROOT + '.git')) {
   }
 }
 
+// Show which commit is running, so a deploy is easy to confirm in the console.
+try {
+  console.log('[version]', run('git -c safe.directory=* log -1 --format="%h %s"'));
+} catch {
+  // Not a git checkout (e.g. a Docker build without .git): nothing to show.
+}
+
 await import('./bot.js');
