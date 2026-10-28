@@ -35,7 +35,8 @@ if (autoUpdate && existsSync(ROOT + '.git')) {
     }
   } catch (err) {
     // Never block startup on an update problem: run whatever code is already here.
-    console.warn('[update] skipped:', (err.stderr || err.message).toString().trim().split('\n').pop());
+    const lines = (err.stderr || err.message).toString().trim().split('\n');
+    console.warn('[update] skipped:', lines.find((l) => /^(fatal|error)/i.test(l)) ?? lines[0]);
   }
 }
 
