@@ -1,15 +1,32 @@
 {
   "channels": {
     "welcome": "welcome-to-shadow-graden",
+    "goodbye": "welcome-to-shadow-graden",
     "rules": "rules",
     "guides": "guides-tutorials",
     "chat": "chat-room"
   },
   "color": "#7F77DD",
+  "goodbyeColor": "#4A4766",
+  "interestRoles": [
+    { "role": "AI", "emoji": "🤖", "description": "AI tools, prompts and news" },
+    { "role": "Design", "emoji": "🎨", "description": "Design assets and feedback" },
+    { "role": "Memes", "emoji": "👀", "description": "Memes and off-topic fun" }
+  ],
+  "rules": [
+    "Respect every shadow. No harassment, hate or personal attacks.",
+    "No spam, self-promo or DM advertising without permission.",
+    "Keep posts in the right channel.",
+    "No NSFW, illegal or pirated content.",
+    "Follow Discord's Terms of Service and Community Guidelines.",
+    "Moderators have the final say."
+  ],
   "text": {
     "joinLine": "{user} has stepped out of the light.",
     "title": "A new shadow has awakened",
     "lore": "We work from the shadows. Learn our ways, pick your path, then go make some noise.",
-    "footer": "Hide in the shadows, rise in the garden"
+    "footer": "Hide in the shadows, rise in the garden",
+    "goodbyeTitle": "{name} faded into the shadows",
+    "goodbyeLine": "Their shadow fades, but the garden remembers."
   }
 }

@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "preview": "node scripts/preview.js",
     "start": "node src/index.js",
-    "test-message": "node scripts/test-message.js"
+    "test-message": "node scripts/test-message.js",
+    "test-buttons": "node scripts/test-buttons.js"
   },
   "keywords": [],
   "author": "",

@@ -1,4 +1,4 @@
-import { AttachmentBuilder, EmbedBuilder } from 'discord.js';
+import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import { readFileSync } from 'node:fs';
 import { renderWelcomeCard } from '../card/welcomeCard.js';
 
@@ -28,8 +28,16 @@ export function findChannel(guild, ref) {
   return guild.channels.cache.find((c) => c.isTextBased?.() !== false && normalizeName(c.name) === target) ?? null;
 }
 
+// Same idea for roles: config uses plain names ("AI"), the server may style them.
+export function findRole(guild, ref) {
+  if (!ref) return null;
+  if (/^\d+$/.test(ref)) return guild.roles.cache.get(ref) ?? null;
+  const target = normalizeName(ref);
+  return guild.roles.cache.find((r) => normalizeName(r.name) === target) ?? null;
+}
+
 // Clickable #channel mention if it exists, plain text otherwise.
-function channelMention(guild, ref) {
+export function channelMention(guild, ref) {
   const ch = findChannel(guild, ref);
   return ch ? `<#${ch.id}>` : `#${ref}`;
 }
@@ -69,7 +77,49 @@ export async function buildWelcomeMessage(member) {
     content: text.joinLine.replace('{user}', `<@${member.id}>`),
     embeds: [embed],
     files: [file],
+    components: [welcomeButtons(member.id, 0)],
     // Ping only the new member, never @everyone or roles.
     allowedMentions: { users: [member.id] },
   };
+}
+
+/**
+ * Goodbye message: the faded card plus a short embed. No ping, since they've already left.
+ * Works on partial members (left before the bot cached them), so it only relies on member.user.
+ */
+export async function buildGoodbyeMessage(member) {
+  const { user, guild } = member;
+  const name = member.displayName ?? user.globalName ?? user.username;
+
+  const png = await renderWelcomeCard({
+    avatarURL: user.displayAvatarURL({ extension: 'png', size: 256 }),
+    username: name,
+    memberNumber: guild.memberCount,
+    joinedAt: new Date(),
+    faded: true,
+  });
+  const file = new AttachmentBuilder(png, { name: 'goodbye.png' });
+
+  const embed = new EmbedBuilder()
+    .setColor(config.goodbyeColor)
+    .setTitle(config.text.goodbyeTitle.replace('{name}', name))
+    .setDescription(config.text.goodbyeLine)
+    .setImage('attachment://goodbye.png')
+    .setFooter({ text: `${guild.memberCount} shadows remain` });
+
+  return { embeds: [embed], files: [file], allowedMentions: { parse: [] } };
+}
+
+// Button custom IDs carry the new member's ID so a click knows who is being welcomed,
+// even after a bot restart.
+export function welcomeButtons(memberId, count) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`greet:${memberId}`)
+      .setLabel(`Welcome them (${count})`)
+      .setEmoji('👋')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('roles:open').setLabel('Pick roles').setEmoji('🎭').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('rules:show').setLabel('Rules').setEmoji('📜').setStyle(ButtonStyle.Secondary),
+  );
 }

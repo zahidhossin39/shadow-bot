@@ -1,8 +1,10 @@
 import 'dotenv/config';
-import { Client, Events, GatewayIntentBits, PermissionFlagsBits } from 'discord.js';
+import { Client, Events, GatewayIntentBits, Partials, PermissionFlagsBits } from 'discord.js';
 import * as memberAdd from './events/memberAdd.js';
+import * as memberRemove from './events/memberRemove.js';
 import * as welcomeTest from './commands/welcomeTest.js';
-import { config, findChannel } from './welcome/message.js';
+import { handleWelcomeInteraction } from './welcome/interactions.js';
+import { config, findChannel, findRole } from './welcome/message.js';
 
 if (!process.env.DISCORD_TOKEN) {
   console.error('Missing DISCORD_TOKEN. Create a file named .env in the Shadow-Bot folder with:\nDISCORD_TOKEN=your-bot-token');
@@ -12,18 +14,26 @@ if (!process.env.DISCORD_TOKEN) {
 const commands = new Map([[welcomeTest.data.name, welcomeTest]]);
 
 // GuildMembers is the privileged "Server Members Intent": without it, join events never arrive.
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers] });
+// Partials.GuildMember: members who joined before the bot started aren't cached,
+// and without this their leave events would be dropped silently.
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+  partials: [Partials.GuildMember],
+});
 
 client.on(memberAdd.name, memberAdd.execute);
+client.on(memberRemove.name, memberRemove.execute);
 
 client.on(Events.InteractionCreate, async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
-  const command = commands.get(interaction.commandName);
-  if (!command) return;
   try {
-    await command.execute(interaction);
+    if (interaction.isChatInputCommand()) {
+      const command = commands.get(interaction.commandName);
+      if (command) await command.execute(interaction);
+      return;
+    }
+    await handleWelcomeInteraction(interaction);
   } catch (err) {
-    console.error(`[/${interaction.commandName}]`, err);
+    console.error(`[interaction ${interaction.commandName ?? interaction.customId}]`, err);
     const msg = { content: 'Something went wrong. Check the bot console.' };
     if (interaction.deferred || interaction.replied) await interaction.editReply(msg).catch(() => {});
   }
@@ -37,6 +47,16 @@ client.once(Events.ClientReady, async (c) => {
     // Guild commands show up instantly; global ones can take up to an hour.
     await guild.commands.set(body);
     console.log(`[${guild.name}] registered: ${body.map((b) => '/' + b.name).join(', ')}`);
+
+    // Role picker: report missing roles and roles the bot is too low to hand out.
+    const me = guild.members.me;
+    const roleNotes = config.interestRoles.map(({ role }) => {
+      const r = findRole(guild, role);
+      if (!r) return `${role}: NOT FOUND`;
+      return r.position >= me.roles.highest.position ? `${r.name}: bot role is BELOW it` : `${r.name}: ok`;
+    });
+    const canManage = me.permissions.has(PermissionFlagsBits.ManageRoles);
+    console.log(`[${guild.name}] role picker: ${roleNotes.join(', ')}${canManage ? '' : ' (bot is MISSING Manage Roles)'}`);
 
     const channel = findChannel(guild, config.channels.welcome);
     if (!channel) {
