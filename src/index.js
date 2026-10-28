@@ -1,80 +1,42 @@
-import 'dotenv/config';
-import { Client, Events, GatewayIntentBits, Partials, PermissionFlagsBits } from 'discord.js';
-import * as memberAdd from './events/memberAdd.js';
-import * as memberRemove from './events/memberRemove.js';
-import * as welcomeTest from './commands/welcomeTest.js';
-import { handleWelcomeInteraction } from './welcome/interactions.js';
-import { config, findChannel } from './welcome/message.js';
+// Entry point. On the host, pull the latest code from GitHub first, then start the bot,
+// so a plain restart is all it takes to deploy. On your PC it just starts the bot.
+import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-if (!process.env.DISCORD_TOKEN) {
-  console.error('Missing DISCORD_TOKEN. Create a file named .env in the Shadow-Bot folder with:\nDISCORD_TOKEN=your-bot-token');
-  process.exit(1);
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
+
+// Panel hosts (Enzonic/Pterodactyl) set SERVER_UUID. AUTO_UPDATE=1 forces it on, 0 forces it off.
+const onHost = Boolean(process.env.SERVER_UUID || process.env.P_SERVER_UUID);
+const autoUpdate = process.env.AUTO_UPDATE ? process.env.AUTO_UPDATE === '1' : onHost;
+
+function run(cmd) {
+  return execSync(cmd, { cwd: ROOT, encoding: 'utf8', timeout: 120_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
-const commands = new Map([[welcomeTest.data.name, welcomeTest]]);
+// Fingerprint of the dependency files, to tell whether a pull changed them.
+function depsHash() {
+  const h = createHash('sha256');
+  for (const f of ['package.json', 'package-lock.json']) {
+    if (existsSync(ROOT + f)) h.update(readFileSync(ROOT + f));
+  }
+  return h.digest('hex');
+}
 
-// GuildMembers is the privileged "Server Members Intent": without it, join events never arrive.
-// Partials.GuildMember: members who joined before the bot started aren't cached,
-// and without this their leave events would be dropped silently.
-const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
-  partials: [Partials.GuildMember],
-});
-
-client.on(memberAdd.name, memberAdd.execute);
-client.on(memberRemove.name, memberRemove.execute);
-
-client.on(Events.InteractionCreate, async (interaction) => {
+if (autoUpdate && existsSync(ROOT + '.git')) {
+  const before = depsHash();
   try {
-    if (interaction.isChatInputCommand()) {
-      const command = commands.get(interaction.commandName);
-      if (command) await command.execute(interaction);
-      return;
+    // safe.directory: the host's installer may have created the repo as a different user.
+    console.log('[update]', run('git -c safe.directory=* pull --ff-only'));
+    if (depsHash() !== before) {
+      console.log('[update] dependencies changed, running npm install…');
+      run('npm install --omit=dev --no-audit --no-fund');
     }
-    await handleWelcomeInteraction(interaction);
   } catch (err) {
-    console.error(`[interaction ${interaction.commandName ?? interaction.customId}]`, err);
-    const msg = { content: 'Something went wrong. Check the bot console.' };
-    if (interaction.deferred || interaction.replied) await interaction.editReply(msg).catch(() => {});
+    // Never block startup on an update problem: run whatever code is already here.
+    console.warn('[update] skipped:', (err.stderr || err.message).toString().trim().split('\n').pop());
   }
-});
+}
 
-client.once(Events.ClientReady, async (c) => {
-  console.log(`Logged in as ${c.user.tag}`);
-  const body = [...commands.values()].map((cmd) => cmd.data.toJSON());
-
-  for (const guild of c.guilds.cache.values()) {
-    // Guild commands show up instantly; global ones can take up to an hour.
-    await guild.commands.set(body);
-    console.log(`[${guild.name}] registered: ${body.map((b) => '/' + b.name).join(', ')}`);
-
-    const channel = findChannel(guild, config.channels.welcome);
-    if (!channel) {
-      const names = guild.channels.cache.filter((ch) => ch.isTextBased()).map((ch) => ch.name);
-      console.warn(`[${guild.name}] welcome channel "${config.channels.welcome}" not found. Text channels: ${names.join(', ')}`);
-      continue;
-    }
-    const needed = ['ViewChannel', 'SendMessages', 'EmbedLinks', 'AttachFiles'];
-    const missing = needed.filter((p) => !channel.permissionsFor(c.user)?.has(PermissionFlagsBits[p]));
-    console.log(
-      missing.length
-        ? `[${guild.name}] #${channel.name}: bot is MISSING permissions: ${missing.join(', ')}`
-        : `[${guild.name}] #${channel.name}: ready to post welcomes`,
-    );
-  }
-});
-
-client.login(process.env.DISCORD_TOKEN).catch((err) => {
-  if (err.message.includes('disallowed intents')) {
-    console.error(
-      'Discord refused the connection: "Server Members Intent" is off for this bot.\n' +
-        'Fix: discord.com/developers/applications → your app → Bot → Privileged Gateway Intents →\n' +
-        'turn on SERVER MEMBERS INTENT → click "Save Changes" at the bottom, then start the bot again.',
-    );
-  } else if (err.code === 'TokenInvalid') {
-    console.error('Discord rejected the token. Reset it in the Developer Portal (Bot → Reset Token) and update .env.');
-  } else {
-    console.error('Login failed:', err);
-  }
-  process.exit(1);
-});
+await import('./bot.js');
