@@ -3,6 +3,8 @@ import { Client, Events, GatewayIntentBits, Partials, PermissionFlagsBits } from
 import * as memberAdd from './events/memberAdd.js';
 import * as memberRemove from './events/memberRemove.js';
 import * as welcomeTest from './commands/welcomeTest.js';
+import * as newsNow from './commands/newsNow.js';
+import { startNews } from './news/scheduler.js';
 import { handleWelcomeInteraction } from './welcome/interactions.js';
 import { config, findChannel } from './welcome/message.js';
 
@@ -11,7 +13,7 @@ if (!process.env.DISCORD_TOKEN) {
   process.exit(1);
 }
 
-const commands = new Map([[welcomeTest.data.name, welcomeTest]]);
+const commands = new Map([welcomeTest, newsNow].map((cmd) => [cmd.data.name, cmd]));
 
 // GuildMembers is the privileged "Server Members Intent": without it, join events never arrive.
 // Partials.GuildMember: members who joined before the bot started aren't cached,
@@ -62,6 +64,8 @@ client.once(Events.ClientReady, async (c) => {
         : `[${guild.name}] #${channel.name}: ready to post welcomes`,
     );
   }
+
+  startNews(c);
 });
 
 client.login(process.env.DISCORD_TOKEN).catch((err) => {

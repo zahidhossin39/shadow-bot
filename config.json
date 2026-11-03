@@ -16,6 +16,45 @@
     "Follow Discord's Terms of Service and Community Guidelines.",
     "Moderators have the final say."
   ],
+  "news": {
+    "channel": "news-updates",
+    "timezone": "Asia/Dhaka",
+    "times": ["09:00", "15:00", "21:00"],
+    "perCategory": 2,
+    "maxAgeHours": 36,
+    "categories": [
+      {
+        "name": "Tech & AI",
+        "emoji": "🤖",
+        "color": "#7F77DD",
+        "feeds": [
+          { "name": "The Verge", "url": "https://www.theverge.com/rss/index.xml" },
+          { "name": "Ars Technica", "url": "https://feeds.arstechnica.com/arstechnica/index" },
+          { "name": "TechCrunch AI", "url": "https://techcrunch.com/category/artificial-intelligence/feed/" }
+        ]
+      },
+      {
+        "name": "Cybersecurity",
+        "emoji": "🛡️",
+        "color": "#2ECC71",
+        "feeds": [
+          { "name": "The Hacker News", "url": "https://feeds.feedburner.com/TheHackersNews" },
+          { "name": "BleepingComputer", "url": "https://www.bleepingcomputer.com/feed/" },
+          { "name": "Krebs on Security", "url": "https://krebsonsecurity.com/feed/" }
+        ]
+      },
+      {
+        "name": "Video & Creators",
+        "emoji": "🎬",
+        "color": "#E67E22",
+        "feeds": [
+          { "name": "No Film School", "url": "https://nofilmschool.com/rss.xml" },
+          { "name": "PetaPixel", "url": "https://petapixel.com/feed/" },
+          { "name": "CineD", "url": "https://www.cined.com/feed/" }
+        ]
+      }
+    ]
+  },
   "text": {
     "joinLine": "{user} has stepped out of the light.",
     "title": "A new shadow has awakened",
