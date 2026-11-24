@@ -2,12 +2,13 @@
 import { Collection } from 'discord.js';
 import assert from 'node:assert/strict';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
-import { buildGoodbyeMessage, buildWelcomeMessage } from '../src/welcome/message.js';
+import { buildGoodbyeMessage, buildWelcomeMessage, config } from '../src/welcome/message.js';
 import { handleWelcomeInteraction } from '../src/welcome/interactions.js';
 
 await rm(new URL('../data/', import.meta.url), { recursive: true, force: true });
 
-const channels = new Collection([['c-rules', { id: 'c-rules', name: '⚖️・ʀᴜʟᴇs-ᴀɴᴅ-ɢᴜɪᴅᴀɴᴄᴇ' }]]);
+const RULES_ID = config.channels.rules;
+const channels = new Collection([[RULES_ID, { id: RULES_ID, name: '⚖️・ʀᴜʟᴇs-ᴀɴᴅ-ɢᴜɪᴅᴀɴᴄᴇ' }]]);
 const guild = { name: 'Shadow Garden', memberCount: 128, channels: { cache: channels } };
 
 const avatar = () => 'https://cdn.discordapp.com/embed/avatars/1.png';
@@ -72,7 +73,7 @@ console.log('✓ greet counter: self blocked, 0 → 1 → 2, double-click blocke
 i = click({ customId: 'rules:show', userId: 'alice' });
 await handleWelcomeInteraction(i);
 assert.ok(i.calls[0][1].flags);
-assert.match(i.calls[0][1].embeds[0].toJSON().description, /<#c-rules>/);
+assert.match(i.calls[0][1].embeds[0].toJSON().description, new RegExp(`<#${RULES_ID}>`));
 console.log('✓ rules: private reply with link to #rules');
 
 await rm(new URL('../data/', import.meta.url), { recursive: true, force: true });

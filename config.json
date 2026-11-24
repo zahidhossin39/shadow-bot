@@ -1,11 +1,11 @@
 {
   "channels": {
-    "welcome": "welcome-to-shadow-graden",
-    "goodbye": "welcome-to-shadow-graden",
-    "rules": "rules-and-guidance",
-    "intro": "introduction",
-    "guides": "guides-tutorials",
-    "chat": "chat-room"
+    "welcome": "1522981855916462160",
+    "goodbye": "1522981855916462160",
+    "rules": "1525425218896527451",
+    "intro": "1525170918383681688",
+    "guides": "1561488726746599564",
+    "chat": "1303029398685089825"
   },
   "color": "#7F77DD",
   "goodbyeColor": "#4A4766",
@@ -28,7 +28,7 @@
     "Breaking the rules leads to: warning → mute → kick → ban, depending on how serious it is."
   ],
   "news": {
-    "channel": "news-updates",
+    "channel": "1561489312032366692",
     "timezone": "Asia/Dhaka",
     "times": ["09:00", "15:00", "21:00"],
     "perCategory": 2,

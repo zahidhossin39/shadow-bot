@@ -2,7 +2,7 @@
 // Re-run after editing rules in config.json: it edits the bot's existing post instead of adding a new one.
 import 'dotenv/config';
 import { Client, GatewayIntentBits, PermissionFlagsBits } from 'discord.js';
-import { findChannel, normalizeName, rulesEmbed } from '../src/welcome/message.js';
+import { config, findChannel, normalizeName, rulesEmbed } from '../src/welcome/message.js';
 
 const NEW_NAME = '⚖️・ʀᴜʟᴇs-ᴀɴᴅ-ɢᴜɪᴅᴀɴᴄᴇ';
 
@@ -10,7 +10,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 client.once('clientReady', async () => {
   try {
     for (const guild of client.guilds.cache.values()) {
-      const channel = findChannel(guild, 'rules-and-guidance') ?? guild.channels.cache.find((c) => normalizeName(c.name) === 'rules');
+      const channel = findChannel(guild, config.channels.rules) ?? guild.channels.cache.find((c) => normalizeName(c.name) === 'rules');
       if (!channel) {
         console.warn(`[${guild.name}] no rules channel found`);
         continue;
