@@ -3,6 +3,7 @@
 // Checks once a minute; if the bot was offline at a posting time, it catches up at startup.
 import { config, findChannel } from '../welcome/message.js';
 import { collectStories, editionHeader, storyEmbed } from './edition.js';
+import { recentEdition } from './badge.js';
 import { lastSlot, markPosted, setLastSlot } from './newsStore.js';
 
 const news = config.news;
@@ -31,12 +32,6 @@ export function currentSlot(now = new Date()) {
 
 let running = false;
 
-/** True if an edition (Gemini's or ours) was posted in the last 20 hours, so the fallback isn't needed. */
-async function recentEdition(channel) {
-  const messages = await channel.messages.fetch({ limit: 50 });
-  const since = Date.now() - 20 * 3_600_000;
-  return messages.some((m) => m.author.id === channel.client.user.id && m.content.startsWith('## 🗞️') && m.createdTimestamp > since);
-}
 
 /** Post one edition to the news channel of every server. Returns how many stories were posted. */
 export async function postEdition(client, { fallback = false } = {}) {

@@ -5,6 +5,7 @@ import * as memberRemove from './events/memberRemove.js';
 import * as welcomeTest from './commands/welcomeTest.js';
 import * as newsNow from './commands/newsNow.js';
 import { startNews } from './news/scheduler.js';
+import { startBadge } from './news/badge.js';
 import { handleWelcomeInteraction } from './welcome/interactions.js';
 import { config, findChannel } from './welcome/message.js';
 
@@ -19,7 +20,7 @@ const commands = new Map([welcomeTest, newsNow].map((cmd) => [cmd.data.name, cmd
 // Partials.GuildMember: members who joined before the bot started aren't cached,
 // and without this their leave events would be dropped silently.
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages],
   partials: [Partials.GuildMember],
 });
 
@@ -66,6 +67,7 @@ client.once(Events.ClientReady, async (c) => {
   }
 
   startNews(c);
+  startBadge(c);
 });
 
 client.login(process.env.DISCORD_TOKEN).catch((err) => {
