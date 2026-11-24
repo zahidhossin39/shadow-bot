@@ -132,22 +132,38 @@ async function discord(env, path, body) {
   throw new Error('Discord rate limit');
 }
 
-/** The article's own preview image (og:image). */
-async function pageImage(link) {
+const decode = (t) =>
+  t
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .trim();
+
+/** The article's own preview data from its meta tags: title, description, image, site name. */
+async function pageMeta(link) {
+  const meta = {};
   try {
     const res = await fetch(link, { headers: { 'user-agent': 'Mozilla/5.0 (compatible; ShadowNews/1.0)' }, signal: AbortSignal.timeout(8000) });
     const html = (await res.text()).slice(0, 300_000);
     for (const tag of html.match(/<meta[^>]+>/gi) ?? []) {
-      if (/(property|name)=["'](og:image|twitter:image)["']/i.test(tag)) {
-        const src = tag.match(/content=["']([^"']+)["']/i)?.[1]?.replace(/&amp;/g, '&');
-        if (src && /^https?:\/\//.test(src)) return src;
-      }
+      const key = tag.match(/(?:property|name)=["']([^"']+)["']/i)?.[1]?.toLowerCase();
+      const value = tag.match(/content=["']([^"']*)["']/i)?.[1];
+      if (!key || !value) continue;
+      const set = (k) => { if (!meta[k]) meta[k] = decode(value); };
+      if (key === 'og:title' || key === 'twitter:title') set('title');
+      if (key === 'og:description' || key === 'twitter:description' || key === 'description') set('description');
+      if ((key === 'og:image' || key === 'twitter:image') && /^https?:\/\//.test(decode(value))) set('image');
+      if (key === 'og:site_name') set('site');
     }
+    if (!meta.title) meta.title = decode(html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ?? '');
   } catch {
-    // Blocked or slow page: post without an image.
+    // Blocked or slow page: post with what we have.
   }
-  return null;
+  return meta;
 }
+
+const pageImage = async (link) => (await pageMeta(link)).image ?? null;
 
 function editionHeader(title) {
   const date = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dhaka', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
@@ -173,10 +189,45 @@ async function postStory(env, s) {
   await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { embeds: [embed], allowed_mentions: { parse: [] } });
 }
 
+/** "link | category | headline | why it matters" lines -> stories. Category and headline are optional. */
+function parseEdition(text) {
+  const stories = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const parts = raw.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, '').split('|').map((x) => x.trim());
+    const url = parts[0]?.match(/https?:\/\/\S+/)?.[0];
+    if (!url) continue;
+    let category = 'other';
+    let rest = parts.slice(1);
+    if (rest.length && CATEGORY_COLORS[rest[0].toLowerCase()]) category = rest.shift().toLowerCase();
+    const headline = rest.length > 1 ? rest.shift() : '';
+    stories.push({ url, category, headline, why: rest.join(' | ') });
+  }
+  return stories.slice(0, 10);
+}
+
+async function postEdition(env, stories, title) {
+  const metas = await Promise.all(stories.map((s) => pageMeta(s.url)));
+  await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { content: editionHeader(title || `Today's Top ${stories.length}`), allowed_mentions: { parse: [] } });
+  for (const [i, s] of stories.entries()) {
+    const m = metas[i];
+    const site = m.site || new URL(s.url).hostname.replace(/^www\./, '');
+    const lines = [m.description, s.why && `**Why it matters:** ${s.why}`].filter(Boolean);
+    const embed = {
+      color: CATEGORY_COLORS[s.category],
+      author: { name: `#${i + 1} · ${CATEGORY_LABELS[s.category]} · ${site}`.slice(0, 256) },
+      title: (s.headline || m.title || site).slice(0, 256),
+      url: s.url,
+      description: lines.join('\n\n').slice(0, 1000) || undefined,
+    };
+    if (m.image) embed.image = { url: m.image };
+    await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { embeds: [embed], allowed_mentions: { parse: [] } });
+  }
+}
+
 // ---------- MCP ----------
-// Gemini's custom connectors reliably call tools whose inputs are a few short plain strings
-// (verified live). A tool taking a JSON list in one string, or a nested array, was listed but
-// never called. So it's one story per call, every field a plain string.
+// Verified live in Gemini devmode: Gemini calls tools whose inputs are plain strings, but makes
+// only one custom-tool call per turn. So a whole edition goes in one call (post_edition), as short
+// "link | category | why" lines; the server fetches headline, summary and image itself.
 function buildServer(env) {
   const server = new McpServer({ name: 'shadow-news', version: '1.0.0' });
   server.registerTool(
@@ -184,9 +235,8 @@ function buildServer(env) {
     {
       title: 'Post one news story to Shadow Garden',
       description:
-        'Posts one news story to the Shadow Garden Discord news channel, with its image. ' +
-        'For a daily edition, call it once per story, most important first, with rank 1, 2, 3 and so on. ' +
-        'Rank 1 also posts the edition header.',
+        'Posts a single news story to the Shadow Garden Discord news channel, with its image. ' +
+        'Rank 1 also posts the edition header. For the full daily news, use post_edition instead.',
       inputSchema: {
         rank: z.string().describe('Position in today\'s list, like 1'),
         title: z.string().describe('Headline'),
@@ -210,17 +260,26 @@ function buildServer(env) {
       }
     },
   );
-  // A/B probe: the tool Gemini did call. Logs only, posts nothing.
   server.registerTool(
-    'post_test_message',
+    'post_edition',
     {
-      title: 'Post a test message to Shadow Garden',
-      description: 'Posts a short test message to the Shadow Garden Discord server. Use it when asked to send a test or hello to Shadow Bot / Discord.',
-      inputSchema: { text: z.string().max(300).describe('The message to post') },
+      title: "Post today's news edition to Shadow Garden",
+      description:
+        "Posts a whole news edition (up to 10 stories) to the Shadow Garden Discord news channel in one call. " +
+        'The server adds each article summary and image from the link. Use this for the daily news.',
+      inputSchema: {
+        stories: z
+          .string()
+          .describe('One story per line, most important first, as: link | category | headline | why it matters. Category is one of ai, tech, security, creators, other.'),
+      },
     },
-    async ({ text }) => {
-      console.log('TOOL CALLED post_test_message:', text);
-      return { content: [{ type: 'text', text: 'Posted to Shadow Garden.' }] };
+    async ({ stories: text }, extra) => {
+      const stories = parseEdition(text ?? '');
+      console.log('post_edition called', stories.length, 'stories');
+      if (!stories.length) return { content: [{ type: 'text', text: 'No stories found. Send one per line: link | category | headline | why it matters.' }], isError: true };
+      // Post in the background so Gemini gets an answer right away.
+      env.ctx.waitUntil(postEdition(env, stories).catch((err) => console.error('post_edition failed', err)));
+      return { content: [{ type: 'text', text: `Posting ${stories.length} stories to Shadow Garden now.` }] };
     },
   );
   return server;
@@ -241,7 +300,8 @@ async function mcp(request, env) {
 
 // ---------- router ----------
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
+    env = { ...env, ctx };
     const url = new URL(request.url);
     const base = url.origin;
     const path = url.pathname;
