@@ -1,5 +1,6 @@
-// Posts a news edition at each configured time (e.g. 09:00, 15:00, 21:00 Dhaka time).
-// Checks once a minute; if the bot was offline at a posting time, it catches up on the missed edition at startup.
+// Fallback edition: Gemini posts the daily top 10 at 2 PM Dhaka time through the Shadow News Worker.
+// At each configured time (14:30) the bot posts an RSS edition only if no edition was posted in the last 20 hours.
+// Checks once a minute; if the bot was offline at a posting time, it catches up at startup.
 import { config, findChannel } from '../welcome/message.js';
 import { collectStories, editionHeader, storyEmbed } from './edition.js';
 import { lastSlot, markPosted, setLastSlot } from './newsStore.js';
@@ -30,22 +31,32 @@ export function currentSlot(now = new Date()) {
 
 let running = false;
 
+/** True if an edition (Gemini's or ours) was posted in the last 20 hours, so the fallback isn't needed. */
+async function recentEdition(channel) {
+  const messages = await channel.messages.fetch({ limit: 50 });
+  const since = Date.now() - 20 * 3_600_000;
+  return messages.some((m) => m.author.id === channel.client.user.id && m.content.startsWith('## 🗞️') && m.createdTimestamp > since);
+}
+
 /** Post one edition to the news channel of every server. Returns how many stories were posted. */
-export async function postEdition(client) {
+export async function postEdition(client, { fallback = false } = {}) {
   if (running) return 0;
   running = true;
   try {
+    const channels = [];
+    for (const guild of client.guilds.cache.values()) {
+      const channel = findChannel(guild, news.channel);
+      if (!channel) console.warn(`[news] [${guild.name}] channel "${news.channel}" not found`);
+      else if (fallback && (await recentEdition(channel))) console.log(`[news] [${guild.name}] Gemini edition already posted, skipping fallback`);
+      else channels.push(channel);
+    }
+    if (!channels.length) return 0;
     const stories = await collectStories();
     if (!stories.length) {
       console.log('[news] no new stories this time');
       return 0;
     }
-    for (const guild of client.guilds.cache.values()) {
-      const channel = findChannel(guild, news.channel);
-      if (!channel) {
-        console.warn(`[news] [${guild.name}] channel "${news.channel}" not found`);
-        continue;
-      }
+    for (const channel of channels) {
       await channel.send(editionHeader());
       // One message per story, so every story gets its own big image.
       for (const story of stories) await channel.send({ embeds: [storyEmbed(story)] });
@@ -64,7 +75,7 @@ export function startNews(client) {
     if (slot === lastSlot() || running) return;
     console.log(`[news] edition ${slot}`);
     try {
-      await postEdition(client);
+      await postEdition(client, { fallback: true });
       setLastSlot(slot);
     } catch (err) {
       console.error('[news] edition failed, will retry next minute:', err);

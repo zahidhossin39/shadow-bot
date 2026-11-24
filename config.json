@@ -30,7 +30,7 @@
   "news": {
     "channel": "1561489312032366692",
     "timezone": "Asia/Dhaka",
-    "times": ["09:00", "15:00", "21:00"],
+    "times": ["14:30"],
     "perCategory": 2,
     "maxAgeHours": 36,
     "categories": [
