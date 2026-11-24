@@ -7,7 +7,7 @@ import { handleWelcomeInteraction } from '../src/welcome/interactions.js';
 
 await rm(new URL('../data/', import.meta.url), { recursive: true, force: true });
 
-const channels = new Collection([['c-rules', { id: 'c-rules', name: '⚖️・ʀᴜʟᴇs' }]]);
+const channels = new Collection([['c-rules', { id: 'c-rules', name: '⚖️・ʀᴜʟᴇs-ᴀɴᴅ-ɢᴜɪᴅᴀɴᴄᴇ' }]]);
 const guild = { name: 'Shadow Garden', memberCount: 128, channels: { cache: channels } };
 
 const avatar = () => 'https://cdn.discordapp.com/embed/avatars/1.png';
@@ -34,6 +34,7 @@ const welcome = await buildWelcomeMessage(newMember);
 const buttons = welcome.components[0].toJSON().components;
 assert.deepEqual(buttons.map((b) => b.custom_id), ['greet:new', 'rules:show']);
 assert.equal(buttons[0].label, 'Welcome them (0)');
+assert.equal(buttons[1].label, 'Rules & Guidance');
 console.log('✓ welcome message has Welcome them (0) / Rules');
 
 // 2. Goodbye works from a partial member (only .user, no displayName).

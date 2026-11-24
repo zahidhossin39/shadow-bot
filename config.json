@@ -2,19 +2,29 @@
   "channels": {
     "welcome": "welcome-to-shadow-graden",
     "goodbye": "welcome-to-shadow-graden",
-    "rules": "rules",
+    "rules": "rules-and-guidance",
     "guides": "guides-tutorials",
     "chat": "chat-room"
   },
   "color": "#7F77DD",
   "goodbyeColor": "#4A4766",
   "rules": [
-    "Respect every shadow. No harassment, hate or personal attacks.",
-    "No spam, self-promo or DM advertising without permission.",
-    "Keep posts in the right channel.",
-    "No NSFW, illegal or pirated content.",
-    "Follow Discord's Terms of Service and Community Guidelines.",
-    "Moderators have the final say."
+    "**Respect every shadow.** No harassment, hate speech, discrimination, threats or personal attacks.",
+    "**Keep it safe for work.** No NSFW, gore or shock content, including in names, avatars and bios.",
+    "**No spam.** No message flooding, mass pings, caps-lock or emoji walls.",
+    "**No advertising.** No self-promo, server invites or DM ads unless a moderator approves it.",
+    "**Use the right channel.** Read each channel's topic. Off-topic talk goes in #chat-room.",
+    "**No piracy or malware.** No cracked software, pirated assets, leaks or malicious files and links.",
+    "**Ethical security only.** Cybersecurity talk is for learning and defence. No hacking real targets, doxxing or sharing tools to harm others.",
+    "**Give credit.** Don't pass off someone else's edits, art or code as your own.",
+    "**Protect privacy.** Never share anyone's personal info, and be careful with your own.",
+    "**Follow Discord's rules.** Discord's Terms of Service and Community Guidelines apply here, and you must be 13 or older.",
+    "**Moderators have the final say.** Disagree with a decision? DM a moderator, don't argue in public."
+  ],
+  "guidance": [
+    "Stuck or new? Start in {guides} and ask questions in {chat}.",
+    "See something wrong? Report the message or ping a moderator.",
+    "Breaking the rules leads to: warning → mute → kick → ban, depending on how serious it is."
   ],
   "news": {
     "channel": "news-updates",

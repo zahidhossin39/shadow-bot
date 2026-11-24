@@ -111,6 +111,20 @@ export function welcomeButtons(memberId, count) {
       .setLabel(`Welcome them (${count})`)
       .setEmoji('👋')
       .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('rules:show').setLabel('Rules').setEmoji('📜').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('rules:show').setLabel('Rules & Guidance').setEmoji('📜').setStyle(ButtonStyle.Secondary),
   );
+}
+
+/** The full Rules & Guidance embed: used by the Rules button and posted in the rules channel. */
+export function rulesEmbed(guild) {
+  const { channels } = config;
+  const rules = config.rules.map((r, i) => `**${i + 1}.** ${r}`).join('\n');
+  const guidance = config.guidance
+    .map((g) => '• ' + g.replace('{guides}', channelMention(guild, channels.guides)).replace('{chat}', channelMention(guild, channels.chat)))
+    .join('\n');
+  return new EmbedBuilder()
+    .setColor(config.color)
+    .setTitle('📜 Rules & Guidance')
+    .setDescription(`${rules}\n\n**Guidance**\n${guidance}`)
+    .setFooter({ text: config.text.footer });
 }

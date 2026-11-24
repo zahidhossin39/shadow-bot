@@ -1,7 +1,7 @@
 // Click handlers for the welcome message buttons.
-import { EmbedBuilder, MessageFlags } from 'discord.js';
+import { MessageFlags } from 'discord.js';
 import { addGreet } from './greetStore.js';
-import { channelMention, config, welcomeButtons } from './message.js';
+import { channelMention, config, rulesEmbed, welcomeButtons } from './message.js';
 
 const EPHEMERAL = { flags: MessageFlags.Ephemeral };
 
@@ -19,11 +19,8 @@ async function onGreet(interaction, memberId) {
 }
 
 async function onRules(interaction) {
-  const list = config.rules.map((r, i) => `**${i + 1}.** ${r}`).join('\n');
-  const embed = new EmbedBuilder()
-    .setColor(config.color)
-    .setTitle('📜 Rules of the Garden')
-    .setDescription(`${list}\n\nFull rules: ${channelMention(interaction.guild, config.channels.rules)}`);
+  const embed = rulesEmbed(interaction.guild);
+  embed.setDescription(`${embed.data.description}\n\nAlways here: ${channelMention(interaction.guild, config.channels.rules)}`);
   await interaction.reply({ embeds: [embed], ...EPHEMERAL });
 }
 
