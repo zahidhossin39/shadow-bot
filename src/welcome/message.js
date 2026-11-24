@@ -53,7 +53,7 @@ export async function buildWelcomeMessage(member) {
 
   const steps = [
     `**Step 1** · Read ${channelMention(guild, channels.rules)}`,
-    `**Step 2** · Learn in ${channelMention(guild, channels.guides)}`,
+    `**Step 2** · Introduce yourself in ${channelMention(guild, channels.intro)}`,
     `**Step 3** · Say hi in ${channelMention(guild, channels.chat)}`,
   ].join('\n');
 
