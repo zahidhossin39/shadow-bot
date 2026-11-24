@@ -17,9 +17,11 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@napi-rs/canvas": "^1.0.13",
     "discord.js": "^14.27.0",
     "dotenv": "^18.0.9",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "zod": "^4.6.7"
   }
 }
