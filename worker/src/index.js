@@ -1,3 +1,7 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { z } from 'zod';
+
 // Shadow News: an always-on MCP server (Cloudflare Worker) that Gemini calls once a day
 // with the top 10 stories. It adds images and posts them to the Discord news channel.
 //
@@ -172,76 +176,60 @@ async function postNews(env, { stories, edition_title }) {
 }
 
 // ---------- MCP ----------
-const TOOLS = [
-  {
-    name: 'post_news',
-    title: 'Post the daily news to Shadow Garden',
-    description:
-      "Posts today's top news stories to the Shadow Garden Discord news channel, one message per story with its image. " +
-      'Call it once per day with up to 10 stories, most important first.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        edition_title: { type: 'string', description: "Optional header title, default \"Today's Top 10\"" },
-        stories: {
-          type: 'array',
-          minItems: 1,
-          maxItems: 10,
-          items: {
-            type: 'object',
-            properties: {
-              title: { type: 'string', description: 'Headline' },
-              url: { type: 'string', description: 'Link to the original article' },
-              summary: { type: 'string', description: '1-2 sentence summary' },
-              why_it_matters: { type: 'string', description: 'One line on why this matters' },
-              category: { type: 'string', enum: ['ai', 'tech', 'security', 'creators', 'other'] },
-              source: { type: 'string', description: 'Publisher name, e.g. The Verge' },
-              image_url: { type: 'string', description: 'Optional image URL; otherwise the article preview image is used' },
-            },
-            required: ['title', 'url', 'summary', 'category'],
-          },
-        },
+// Uses the official MCP SDK: Gemini only completed tool calls against the SDK's responses,
+// not against a hand-rolled JSON-RPC handler. Inputs stay flat strings for the same reason.
+function buildServer(env) {
+  const server = new McpServer({ name: 'shadow-news', version: '1.0.0' });
+  server.registerTool(
+    'post_news',
+    {
+      title: 'Post the daily news to Shadow Garden',
+      description:
+        "Posts today's top news stories to the Shadow Garden Discord news channel, one message per story with its image. " +
+        'Call it once per day with up to 10 stories, most important first.',
+      inputSchema: {
+        stories_json: z
+          .string()
+          .describe(
+            'JSON array of up to 10 stories, most important first. Each story: ' +
+              '{"title": "...", "url": "https://...", "summary": "1-2 sentences", "why_it_matters": "one line", ' +
+              '"category": "ai|tech|security|creators|other", "source": "publisher name"}',
+          ),
+        edition_title: z.string().optional().describe("Optional header title, default \"Today's Top 10\""),
       },
-      required: ['stories'],
     },
-  },
-];
-
-async function mcp(request, env) {
-  const msg = await request.json();
-  const reply = (result) => json({ jsonrpc: '2.0', id: msg.id, result });
-  const fail = (code, message) => json({ jsonrpc: '2.0', id: msg.id, error: { code, message } });
-
-  switch (msg.method) {
-    case 'initialize':
-      return reply({
-        protocolVersion: msg.params?.protocolVersion ?? '2025-06-18',
-        capabilities: { tools: {} },
-        serverInfo: { name: 'shadow-news', version: '1.0.0' },
-      });
-    case 'ping':
-      return reply({});
-    case 'tools/list':
-      return reply({ tools: TOOLS });
-    case 'tools/call': {
-      if (msg.params?.name !== 'post_news') return fail(-32602, 'Unknown tool');
-      const args = msg.params.arguments ?? {};
-      const stories = (args.stories ?? []).filter((s) => s?.title && /^https?:\/\//.test(s?.url ?? '')).slice(0, 10);
-      if (!stories.length) return reply({ content: [{ type: 'text', text: 'No valid stories (each needs a title and an http(s) url).' }], isError: true });
+    async ({ stories_json, edition_title }) => {
+      console.log('post_news called', stories_json.slice(0, 200));
+      const fail = (text) => ({ content: [{ type: 'text', text }], isError: true });
+      let list;
       try {
-        const n = await postNews(env, { ...args, stories });
+        list = JSON.parse(stories_json);
+      } catch {
+        return fail('stories_json is not valid JSON. Send a JSON array of story objects.');
+      }
+      const stories = (Array.isArray(list) ? list : []).filter((s) => s?.title && /^https?:\/\//.test(s?.url ?? '')).slice(0, 10);
+      if (!stories.length) return fail('No valid stories (each needs a title and an http(s) url).');
+      try {
+        const n = await postNews(env, { edition_title, stories });
         console.log(`posted ${n} stories`);
-        return reply({ content: [{ type: 'text', text: `Posted ${n} stories to Shadow Garden.` }] });
+        return { content: [{ type: 'text', text: `Posted ${n} stories to Shadow Garden.` }] };
       } catch (err) {
         console.error(err);
-        return reply({ content: [{ type: 'text', text: `Posting failed: ${err.message}` }], isError: true });
+        return fail(`Posting failed: ${err.message}`);
       }
-    }
-    default:
-      // Notifications (no id) just get an empty 202.
-      if (msg.id === undefined) return new Response(null, { status: 202 });
-      return fail(-32601, 'Method not found');
-  }
+    },
+  );
+  return server;
+}
+
+async function mcp(request, env) {
+  const body = await request.clone().text();
+  console.log('mcp in:', body.slice(0, 400));
+  // Stateless: a fresh server and transport per request, so there's no session to lose.
+  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  const server = buildServer(env);
+  await server.connect(transport);
+  return transport.handleRequest(request);
 }
 
 // ---------- router ----------

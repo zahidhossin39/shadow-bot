@@ -1,6 +1,7 @@
 name = "shadow-news"
 main = "src/index.js"
 compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 NEWS_CHANNEL_ID = "1561489312032366692"
