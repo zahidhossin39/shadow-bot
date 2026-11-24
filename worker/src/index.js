@@ -154,69 +154,73 @@ function editionHeader(title) {
   return `## 🗞️ ${title || "Today's Top 10"} · ${date}\n-# Picked by Gemini from today's news`;
 }
 
-async function postNews(env, { stories, edition_title }) {
-  const images = await Promise.all(stories.map((s) => (s.image_url ? s.image_url : pageImage(s.url))));
-  await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { content: editionHeader(edition_title), allowed_mentions: { parse: [] } });
-  let posted = 0;
-  for (const [i, s] of stories.entries()) {
-    const cat = CATEGORY_COLORS[s.category] ? s.category : 'other';
-    const lines = [s.summary, s.why_it_matters && `**Why it matters:** ${s.why_it_matters}`].filter(Boolean);
-    const embed = {
-      color: CATEGORY_COLORS[cat],
-      author: { name: `#${i + 1} · ${CATEGORY_LABELS[cat]}${s.source ? ` · ${s.source}` : ''}`.slice(0, 256) },
-      title: s.title.slice(0, 256),
-      url: s.url,
-      description: lines.join('\n\n').slice(0, 1000),
-    };
-    if (images[i]) embed.image = { url: images[i] };
-    await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { embeds: [embed], allowed_mentions: { parse: [] } });
-    posted++;
+async function postStory(env, s) {
+  const rank = Number.parseInt(s.rank, 10) || 0;
+  if (rank === 1) {
+    await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { content: editionHeader(s.edition_title), allowed_mentions: { parse: [] } });
   }
-  return posted;
+  const cat = CATEGORY_COLORS[s.category?.toLowerCase()] ? s.category.toLowerCase() : 'other';
+  const lines = [s.summary, s.why_it_matters && `**Why it matters:** ${s.why_it_matters}`].filter(Boolean);
+  const embed = {
+    color: CATEGORY_COLORS[cat],
+    author: { name: `${rank ? `#${rank} · ` : ''}${CATEGORY_LABELS[cat]}${s.source ? ` · ${s.source}` : ''}`.slice(0, 256) },
+    title: s.title.slice(0, 256),
+    url: s.url,
+    description: lines.join('\n\n').slice(0, 1000),
+  };
+  const image = await pageImage(s.url);
+  if (image) embed.image = { url: image };
+  await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { embeds: [embed], allowed_mentions: { parse: [] } });
 }
 
 // ---------- MCP ----------
-// Uses the official MCP SDK: Gemini only completed tool calls against the SDK's responses,
-// not against a hand-rolled JSON-RPC handler. Inputs stay flat strings for the same reason.
+// Gemini's custom connectors reliably call tools whose inputs are a few short plain strings
+// (verified live). A tool taking a JSON list in one string, or a nested array, was listed but
+// never called. So it's one story per call, every field a plain string.
 function buildServer(env) {
   const server = new McpServer({ name: 'shadow-news', version: '1.0.0' });
   server.registerTool(
-    'post_news',
+    'post_story',
     {
-      title: 'Post the daily news to Shadow Garden',
+      title: 'Post one news story to Shadow Garden',
       description:
-        "Posts today's top news stories to the Shadow Garden Discord news channel, one message per story with its image. " +
-        'Call it once per day with up to 10 stories, most important first.',
+        'Posts one news story to the Shadow Garden Discord news channel, with its image. ' +
+        'For a daily edition, call it once per story, most important first, with rank 1, 2, 3 and so on. ' +
+        'Rank 1 also posts the edition header.',
       inputSchema: {
-        stories_json: z
-          .string()
-          .describe(
-            'JSON array of up to 10 stories, most important first. Each story: ' +
-              '{"title": "...", "url": "https://...", "summary": "1-2 sentences", "why_it_matters": "one line", ' +
-              '"category": "ai|tech|security|creators|other", "source": "publisher name"}',
-          ),
-        edition_title: z.string().optional().describe("Optional header title, default \"Today's Top 10\""),
+        rank: z.string().describe('Position in today\'s list, like 1'),
+        title: z.string().describe('Headline'),
+        url: z.string().describe('Link to the original article'),
+        summary: z.string().describe('One or two sentence summary'),
+        why_it_matters: z.string().describe('One line on why this matters'),
+        category: z.string().describe('One of: ai, tech, security, creators, other'),
+        source: z.string().describe('Publisher name, like The Verge'),
       },
     },
-    async ({ stories_json, edition_title }) => {
-      console.log('post_news called', stories_json.slice(0, 200));
+    async (story) => {
+      console.log('post_story called', story.rank, story.title);
       const fail = (text) => ({ content: [{ type: 'text', text }], isError: true });
-      let list;
+      if (!story.title || !/^https?:\/\//.test(story.url ?? '')) return fail('Each story needs a title and an http(s) url.');
       try {
-        list = JSON.parse(stories_json);
-      } catch {
-        return fail('stories_json is not valid JSON. Send a JSON array of story objects.');
-      }
-      const stories = (Array.isArray(list) ? list : []).filter((s) => s?.title && /^https?:\/\//.test(s?.url ?? '')).slice(0, 10);
-      if (!stories.length) return fail('No valid stories (each needs a title and an http(s) url).');
-      try {
-        const n = await postNews(env, { edition_title, stories });
-        console.log(`posted ${n} stories`);
-        return { content: [{ type: 'text', text: `Posted ${n} stories to Shadow Garden.` }] };
+        await postStory(env, story);
+        return { content: [{ type: 'text', text: `Posted story #${story.rank} to Shadow Garden.` }] };
       } catch (err) {
         console.error(err);
         return fail(`Posting failed: ${err.message}`);
       }
+    },
+  );
+  // A/B probe: the tool Gemini did call. Logs only, posts nothing.
+  server.registerTool(
+    'post_test_message',
+    {
+      title: 'Post a test message to Shadow Garden',
+      description: 'Posts a short test message to the Shadow Garden Discord server. Use it when asked to send a test or hello to Shadow Bot / Discord.',
+      inputSchema: { text: z.string().max(300).describe('The message to post') },
+    },
+    async ({ text }) => {
+      console.log('TOOL CALLED post_test_message:', text);
+      return { content: [{ type: 'text', text: 'Posted to Shadow Garden.' }] };
     },
   );
   return server;
@@ -229,7 +233,10 @@ async function mcp(request, env) {
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   const server = buildServer(env);
   await server.connect(transport);
-  return transport.handleRequest(request);
+  const res = await transport.handleRequest(request);
+  const out = await res.clone().text();
+  console.log('mcp out:', res.status, res.headers.get('content-type'), out.slice(0, 1500));
+  return res;
 }
 
 // ---------- router ----------
