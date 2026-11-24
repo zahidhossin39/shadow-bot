@@ -191,13 +191,18 @@ async function postStory(env, s) {
 
 /** "link | category | headline | why it matters" lines -> stories. Category and headline are optional. */
 function parseEdition(text) {
+  // Each story starts at its link, so this works with or without line breaks between stories.
   const stories = [];
-  for (const raw of text.split(/\r?\n/)) {
-    const parts = raw.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, '').split('|').map((x) => x.trim());
-    const url = parts[0]?.match(/https?:\/\/\S+/)?.[0];
+  for (const chunk of text.split(/(?=https?:\/\/)/)) {
+    const url = chunk.match(/^https?:\/\/[^\s|]+/)?.[0];
     if (!url) continue;
+    const rest = chunk
+      .slice(url.length)
+      .split('|')
+      .map((x) => x.replace(/\s+/g, ' ').replace(/\s*(?:\d+[.)]|[-*•])\s*$/, '').trim());
+    while (rest.length && !rest[0]) rest.shift();
+    while (rest.length && !rest.at(-1)) rest.pop();
     let category = 'other';
-    let rest = parts.slice(1);
     if (rest.length && CATEGORY_COLORS[rest[0].toLowerCase()]) category = rest.shift().toLowerCase();
     const headline = rest.length > 1 ? rest.shift() : '';
     stories.push({ url, category, headline, why: rest.join(' | ') });
@@ -286,16 +291,11 @@ function buildServer(env) {
 }
 
 async function mcp(request, env) {
-  const body = await request.clone().text();
-  console.log('mcp in:', body.slice(0, 400));
   // Stateless: a fresh server and transport per request, so there's no session to lose.
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   const server = buildServer(env);
   await server.connect(transport);
-  const res = await transport.handleRequest(request);
-  const out = await res.clone().text();
-  console.log('mcp out:', res.status, res.headers.get('content-type'), out.slice(0, 1500));
-  return res;
+  return transport.handleRequest(request);
 }
 
 // ---------- router ----------
