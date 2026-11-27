@@ -1,5 +1,5 @@
 // Fallback edition: Gemini posts the daily top 10 at 2 PM Dhaka time through the Shadow News Worker.
-// At each configured time (14:30) the bot posts an RSS edition only if no edition was posted in the last 20 hours.
+// At each configured time (16:00; Gemini runs ~30 min late) the bot posts an RSS edition only if no edition was posted in the last 20 hours.
 // Checks once a minute; if the bot was offline at a posting time, it catches up at startup.
 import { config, findChannel } from '../welcome/message.js';
 import { collectStories, editionHeader, storyEmbed } from './edition.js';
