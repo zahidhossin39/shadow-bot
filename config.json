@@ -73,5 +73,11 @@
     "footer": "Hide in the shadows, rise in the garden",
     "goodbyeTitle": "{name} faded into the shadows",
     "goodbyeLine": "Their shadow fades, but the garden remembers."
+  },
+  "pings": {
+    "channel": "",
+    "options": [
+      { "key": "news", "label": "Daily News", "emoji": "📰", "roleName": "📰 News Pings", "description": "get pinged when the daily top 10 is posted (around 2:30 PM).", "role": "" }
+    ]
   }
 }

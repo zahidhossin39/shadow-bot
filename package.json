@@ -10,7 +10,8 @@
     "test-message": "node scripts/test-message.js",
     "test-buttons": "node scripts/test-buttons.js",
     "test-news": "node scripts/test-news.js",
-    "post-rules": "node scripts/post-rules.js"
+    "post-rules": "node scripts/post-rules.js",
+    "setup-pings": "node scripts/setup-pings.js"
   },
   "keywords": [],
   "author": "",

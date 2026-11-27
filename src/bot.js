@@ -7,6 +7,7 @@ import * as newsNow from './commands/newsNow.js';
 import { startNews } from './news/scheduler.js';
 import { startBadge } from './news/badge.js';
 import { handleWelcomeInteraction } from './welcome/interactions.js';
+import { handlePingInteraction } from './pings/panel.js';
 import { config, findChannel } from './welcome/message.js';
 
 if (!process.env.DISCORD_TOKEN) {
@@ -34,6 +35,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (command) await command.execute(interaction);
       return;
     }
+    if (await handlePingInteraction(interaction)) return;
     await handleWelcomeInteraction(interaction);
   } catch (err) {
     console.error(`[interaction ${interaction.commandName ?? interaction.customId}]`, err);

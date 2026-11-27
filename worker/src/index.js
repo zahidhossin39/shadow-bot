@@ -278,7 +278,10 @@ async function postEdition(env, stories, title) {
   };
   const making = Promise.all([worker(), worker()]);
 
-  await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { content: editionHeader(title || `Today's Top ${stories.length}`), allowed_mentions: { parse: [] } });
+  // Ping only members who opted in (the News Pings role from the notifications channel).
+  const role = env.NEWS_PING_ROLE_ID;
+  const header = editionHeader(title || `Today's Top ${stories.length}`) + (role ? `\n<@&${role}>` : '');
+  await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { content: header, allowed_mentions: { parse: [], roles: role ? [role] : [] } });
   for (const [i, s] of stories.entries()) {
     const m = metas[i];
     const site = m.site || new URL(s.url).hostname.replace(/^www\./, '');

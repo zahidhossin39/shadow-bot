@@ -3,6 +3,7 @@
 // Checks once a minute; if the bot was offline at a posting time, it catches up at startup.
 import { config, findChannel } from '../welcome/message.js';
 import { collectStories, editionHeader, storyEmbed } from './edition.js';
+import { pingMention } from '../pings/panel.js';
 import { recentEdition } from './badge.js';
 import { lastSlot, markPosted, setLastSlot } from './newsStore.js';
 
@@ -52,7 +53,9 @@ export async function postEdition(client, { fallback = false } = {}) {
       return 0;
     }
     for (const channel of channels) {
-      await channel.send(editionHeader());
+      // Mention goes last so the header still starts with "## 🗞️" (badge.js looks for that).
+      const ping = pingMention('news');
+      await channel.send({ content: [editionHeader(), ping].filter(Boolean).join('\n'), allowedMentions: { parse: [], roles: ping ? [config.pings.options[0].role] : [] } });
       // One message per story, so every story gets its own big image.
       for (const story of stories) await channel.send({ embeds: [storyEmbed(story)] });
     }
