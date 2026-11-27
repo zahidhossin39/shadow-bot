@@ -303,6 +303,18 @@ async function postEdition(env, stories, title) {
   await making;
 }
 
+// ---------- post time ----------
+// Gemini's scheduled runs start late by a varying amount (often ~30 min), so the task starts at
+// 1 PM and the edition waits in the queue until exactly 2 PM. Outside 12-2 PM (tests, a late
+// run) it posts right away. Dhaka is UTC+6 all year.
+const POST_AT = 14 * 3600;
+const HOLD_FROM = 12 * 3600;
+
+function secondsUntilPostTime(now = Date.now()) {
+  const secondOfDay = Math.floor((now / 1000 + 6 * 3600) % 86_400);
+  return secondOfDay >= HOLD_FROM && secondOfDay < POST_AT ? POST_AT - secondOfDay : 0;
+}
+
 // ---------- no repeats ----------
 // Gemini doesn't remember earlier days, so the server does: each posted link and headline is
 // kept in KV for 14 days, and a story matching either is skipped.
@@ -393,10 +405,12 @@ function buildServer(env) {
       if (!stories.length) return { content: [{ type: 'text', text: `All ${parsed.length} stories were already posted in the last 14 days. Pick newer stories.` }], isError: true };
       // Ten audio clips take ~2 minutes, more than a request may run in the background,
       // so the edition goes to a queue whose consumer can run for up to 15 minutes.
-      await env.EDITIONS.send({ stories });
+      const delaySeconds = secondsUntilPostTime();
+      await env.EDITIONS.send({ stories }, { delaySeconds });
       await remember(env, stories);
       const skipped = repeats.length ? ` Skipped ${repeats.length} already posted: ${repeats.map((s) => s.headline || s.url).join('; ')}.` : '';
-      return { content: [{ type: 'text', text: `Posting ${stories.length} stories with audio to Shadow Garden now.${skipped}` }] };
+      const when = delaySeconds ? 'at 2:00 PM Dhaka time' : 'now';
+      return { content: [{ type: 'text', text: `Posting ${stories.length} stories with audio to Shadow Garden ${when}.${skipped}` }] };
     },
   );
   return server;

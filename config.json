@@ -77,7 +77,7 @@
   "pings": {
     "channel": "1575888702369173646",
     "options": [
-      {"key":"news","label":"Daily News","emoji":"📰","roleName":"📰 News Pings","channel":"1561489312032366692","description":"the daily top 10 with audio (around 2:30 PM).","cooldownMinutes":30,"role":"1575888699466711060","watch":false},
+      {"key":"news","label":"Daily News","emoji":"📰","roleName":"📰 News Pings","channel":"1561489312032366692","description":"the daily top 10 with audio, every day at 2 PM.","cooldownMinutes":30,"role":"1575888699466711060","watch":false},
       {"key":"announcements","label":"Announcements","emoji":"📢","roleName":"📢 Announcements Pings","channel":"1526803753737523292","description":"server announcements.","cooldownMinutes":0,"role":"1575896572468797620"},
       {"key":"chat","label":"Chat Room","emoji":"🍿","roleName":"🍿 Chat Room Pings","channel":"1303029398685089825","description":"when the chat room gets active (max once every 3 hours).","cooldownMinutes":180,"role":"1575896639745429514"},
       {"key":"memes","label":"Memes","emoji":"👀","roleName":"👀 Memes Pings","channel":"1522983841692647576","description":"new memes.","cooldownMinutes":30,"role":"1575896642916319303"},
