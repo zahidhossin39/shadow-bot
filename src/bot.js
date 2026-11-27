@@ -8,6 +8,7 @@ import { startNews } from './news/scheduler.js';
 import { startBadge } from './news/badge.js';
 import { handleWelcomeInteraction } from './welcome/interactions.js';
 import { handlePingInteraction } from './pings/panel.js';
+import { startChannelPings } from './pings/watch.js';
 import { config, findChannel } from './welcome/message.js';
 
 if (!process.env.DISCORD_TOKEN) {
@@ -70,6 +71,7 @@ client.once(Events.ClientReady, async (c) => {
 
   startNews(c);
   startBadge(c);
+  startChannelPings(c);
 });
 
 client.login(process.env.DISCORD_TOKEN).catch((err) => {

@@ -27,12 +27,20 @@ client.once('clientReady', async () => {
       if (!me.permissions.has(PermissionFlagsBits[p])) console.warn(`[${guild.name}] bot is missing "${p}"`);
     }
 
+    // A role ping only notifies if the role is mentionable or the bot has Mention Everyone.
+    // With that permission, keep roles unmentionable so members can't spam-ping them.
+    const mentionable = !me.permissions.has(PermissionFlagsBits.MentionEveryone);
     for (const option of config.pings.options) {
       let role = guild.roles.cache.get(option.role) ?? guild.roles.cache.find((r) => r.name === option.roleName);
       if (!role) {
-        // Not mentionable by members, so only the bot (Mention Everyone) can ping it.
-        role = await guild.roles.create({ name: option.roleName, mentionable: false, permissions: [], reason: 'Opt-in notifications' });
+        role = await guild.roles.create({ name: option.roleName, mentionable, permissions: [], reason: 'Opt-in notifications' });
         console.log(`[${guild.name}] created role ${role.name}`);
+      } else if (role.mentionable !== mentionable) {
+        await role.setMentionable(mentionable, 'Opt-in notifications');
+      }
+      const ch = findChannel(guild, option.channel);
+      if (option.watch !== false && ch && !ch.permissionsFor(me).has(PermissionFlagsBits.SendMessages)) {
+        console.warn(`[${guild.name}] can't ping in #${ch.name}: bot lacks Send Messages there`);
       }
       if (option.role !== role.id) {
         saveId(new RegExp(`("key": "${option.key}"[\\s\\S]*?"role": )"[^"]*"`), role.id);

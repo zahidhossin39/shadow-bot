@@ -16,13 +16,14 @@ export function panelMessage() {
         'Notifications are **off** for everyone by default. Pick what you want to be pinged for.',
         'Click a button to turn it **on**, click again to turn it **off**.',
         '',
-        ...pings().map((p) => `${p.emoji} **${p.label}**: ${p.description}`),
+        ...pings().map((p) => `${p.emoji} **${p.label}** (<#${p.channel}>): ${p.description}`),
       ].join('\n'),
     );
-  const row = new ActionRowBuilder().addComponents(
-    pings().map((p) => new ButtonBuilder().setCustomId(`ping:${p.key}`).setLabel(p.label).setEmoji(p.emoji).setStyle(ButtonStyle.Secondary)),
-  );
-  return { embeds: [embed], components: [row] };
+  // Discord allows 5 buttons per row and 5 rows, so up to 25 options.
+  const buttons = pings().map((p) => new ButtonBuilder().setCustomId(`ping:${p.key}`).setLabel(p.label).setEmoji(p.emoji).setStyle(ButtonStyle.Secondary));
+  const rows = [];
+  for (let i = 0; i < buttons.length && rows.length < 5; i += 5) rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + 5)));
+  return { embeds: [embed], components: rows };
 }
 
 /** Handles "ping:<key>" buttons. Returns true if it was one of ours. */
