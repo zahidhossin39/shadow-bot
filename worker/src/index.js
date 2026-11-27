@@ -189,7 +189,10 @@ async function postStory(env, s) {
   await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { embeds: [embed], allowed_mentions: { parse: [] } });
 }
 
-/** "link | category | headline | why it matters" lines -> stories. Category and headline are optional. */
+/**
+ * "link | category | headline | summary | why it matters" lines -> stories.
+ * Older shapes still parse: "link | category | headline | why" and "link | why".
+ */
 function parseEdition(text) {
   // Each story starts at its link, so this works with or without line breaks between stories.
   const stories = [];
@@ -205,66 +208,81 @@ function parseEdition(text) {
     let category = 'other';
     if (rest.length && CATEGORY_COLORS[rest[0].toLowerCase()]) category = rest.shift().toLowerCase();
     const headline = rest.length > 1 ? rest.shift() : '';
-    stories.push({ url, category, headline, why: rest.join(' | ') });
+    const summary = rest.length > 1 ? rest.shift() : '';
+    stories.push({ url, category, headline, summary, why: rest.join(' | ') });
   }
   return stories.slice(0, 10);
 }
 
-// ---------- audio summary ----------
-// A spoken recap (15-20 s) posted under the edition. Cloudflare Workers AI text-to-speech, no API key.
-const MAX_WORDS = 50; // ~44 words measured at 18.5 s with the luna voice
+// ---------- audio ----------
+// Each story gets its own spoken summary (15-20 s) right under its card.
+// Cloudflare Workers AI text-to-speech, no API key.
+const MAX_WORDS = 50; // 44 words measured at 18.5 s with the luna voice
 
-/** Gemini's script, or a fallback built from the top 3 headlines; trimmed to fit 20 seconds. */
-function audioScript(script, stories) {
-  let text = (script ?? '').replace(/\s+/g, ' ').trim();
-  if (!text) {
-    const tops = stories.slice(0, 3).map((s) => s.headline).filter(Boolean);
-    if (!tops.length) return '';
-    text = `Here's today's tech news. ${tops.map((h) => h.replace(/[.!?]*$/, '.')).join(' ')} Full stories are above.`;
-  }
-  const words = text.split(' ');
-  if (words.length <= MAX_WORDS) return text;
-  // Too long: cut at the last full sentence that fits.
+/** Trim to fit 20 seconds, cutting at the last full sentence. */
+function fitAudio(text) {
+  const words = (text ?? '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  if (words.length <= MAX_WORDS) return words.join(' ');
   const cut = words.slice(0, MAX_WORDS).join(' ');
   const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
   return end > 0 ? cut.slice(0, end + 1) : `${cut}.`;
 }
 
 async function speak(env, text) {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const out = await env.AI.run('@cf/deepgram/aura-2-en', { text, speaker: 'luna', encoding: 'mp3' });
       return await new Response(out).arrayBuffer();
     } catch (err) {
       console.error('tts failed', attempt, err.message);
+      await sleep(1500 * (attempt + 1));
     }
   }
   return null;
 }
 
-async function postAudio(env, mp3) {
-  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date());
+async function postAudio(env, mp3, name, label) {
   const form = new FormData();
-  form.append('payload_json', JSON.stringify({ content: '🎧 **Today in 20 seconds**', allowed_mentions: { parse: [] } }));
-  form.append('files[0]', new Blob([mp3], { type: 'audio/mpeg' }), `shadow-news-${date}.mp3`);
-  const res = await fetch(`https://discord.com/api/v10/channels/${env.NEWS_CHANNEL_ID}/messages`, {
-    method: 'POST',
-    headers: { authorization: `Bot ${env.DISCORD_TOKEN}` },
-    body: form,
-  });
-  if (!res.ok) throw new Error(`Discord ${res.status}: ${await res.text()}`);
+  form.append('payload_json', JSON.stringify({ content: label, allowed_mentions: { parse: [] } }));
+  form.append('files[0]', new Blob([mp3], { type: 'audio/mpeg' }), name);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch(`https://discord.com/api/v10/channels/${env.NEWS_CHANNEL_ID}/messages`, {
+      method: 'POST',
+      headers: { authorization: `Bot ${env.DISCORD_TOKEN}` },
+      body: form,
+    });
+    if (res.status === 429) {
+      await sleep(((await res.json()).retry_after ?? 1) * 1000 + 100);
+      continue;
+    }
+    if (!res.ok) throw new Error(`Discord ${res.status}: ${await res.text()}`);
+    return;
+  }
 }
 
-async function postEdition(env, stories, title, script) {
-  // Start the audio first: it takes ~13 s, so it runs while the pages are fetched and cards posted.
-  const text = audioScript(script, stories);
-  const audio = text ? speak(env, text) : Promise.resolve(null);
+/** Runs in the queue consumer (up to 15 min), so ten audio clips have time to be made. */
+async function postEdition(env, stories, title) {
+  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date());
   const metas = await Promise.all(stories.map((s) => pageMeta(s.url)));
+  // Audio text: Gemini's summary, else the article's own description.
+  const scripts = stories.map((s, i) => fitAudio(s.summary || metas[i].description));
+  // Make the clips two at a time (more at once made Workers AI return errors), in story order.
+  const clips = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < scripts.length) {
+      const i = next++;
+      clips[i] = scripts[i] ? speak(env, scripts[i]) : Promise.resolve(null);
+      await clips[i];
+    }
+  };
+  const making = Promise.all([worker(), worker()]);
+
   await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { content: editionHeader(title || `Today's Top ${stories.length}`), allowed_mentions: { parse: [] } });
   for (const [i, s] of stories.entries()) {
     const m = metas[i];
     const site = m.site || new URL(s.url).hostname.replace(/^www\./, '');
-    const lines = [m.description, s.why && `**Why it matters:** ${s.why}`].filter(Boolean);
+    const lines = [s.summary || m.description, s.why && `**Why it matters:** ${s.why}`].filter(Boolean);
     const embed = {
       color: CATEGORY_COLORS[s.category],
       author: { name: `#${i + 1} · ${CATEGORY_LABELS[s.category]} · ${site}`.slice(0, 256) },
@@ -274,9 +292,12 @@ async function postEdition(env, stories, title, script) {
     };
     if (m.image) embed.image = { url: m.image };
     await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { embeds: [embed], allowed_mentions: { parse: [] } });
+    // Wait until this story's clip has been started, then for the clip itself.
+    while (!clips[i] && scripts[i]) await sleep(200);
+    const mp3 = await clips[i];
+    if (mp3) await postAudio(env, mp3, `shadow-news-${date}-${i + 1}.mp3`, `🎧 Listen to #${i + 1}`);
   }
-  const mp3 = await audio;
-  if (mp3) await postAudio(env, mp3);
+  await making;
 }
 
 // ---------- MCP ----------
@@ -321,24 +342,25 @@ function buildServer(env) {
       title: "Post today's news edition to Shadow Garden",
       description:
         "Posts a whole news edition (up to 10 stories) to the Shadow Garden Discord news channel in one call. " +
-        'The server adds each article summary and image from the link. Use this for the daily news.',
+        'The server adds each image and reads each summary aloud as an audio clip under its story. Use this for the daily news.',
+      // Keep every field required: with an optional field, Gemini failed before calling the tool (tested 2026-11-27).
       inputSchema: {
         stories: z
           .string()
-          .describe('One story per line, most important first, as: link | category | headline | why it matters. Category is one of ai, tech, security, creators, other.'),
-        // Required on purpose: with an optional field, Gemini failed before calling the tool (tested 2026-11-27).
-        audio_summary: z
-          .string()
-          .describe('A spoken recap of the top stories, 40 to 45 words (under 20 seconds read aloud). Plain sentences, no links or symbols.'),
+          .describe(
+            'One story per line, most important first, as: link | category | headline | summary | why it matters. ' +
+              'Category is one of ai, tech, security, creators, other. Summary is 40 to 45 plain words (read aloud in under 20 seconds), no links or symbols.',
+          ),
       },
     },
-    async ({ stories: text, audio_summary: script }) => {
+    async ({ stories: text }) => {
       const stories = parseEdition(text ?? '');
       console.log('post_edition called', stories.length, 'stories');
-      if (!stories.length) return { content: [{ type: 'text', text: 'No stories found. Send one per line: link | category | headline | why it matters.' }], isError: true };
-      // Post in the background so Gemini gets an answer right away.
-      env.ctx.waitUntil(postEdition(env, stories, undefined, script).catch((err) => console.error('post_edition failed', err)));
-      return { content: [{ type: 'text', text: `Posting ${stories.length} stories to Shadow Garden now.` }] };
+      if (!stories.length) return { content: [{ type: 'text', text: 'No stories found. Send one per line: link | category | headline | summary | why it matters.' }], isError: true };
+      // Ten audio clips take ~2 minutes, more than a request may run in the background,
+      // so the edition goes to a queue whose consumer can run for up to 15 minutes.
+      await env.EDITIONS.send({ stories });
+      return { content: [{ type: 'text', text: `Posting ${stories.length} stories with audio to Shadow Garden now.` }] };
     },
   );
   return server;
@@ -354,6 +376,18 @@ async function mcp(request, env) {
 
 // ---------- router ----------
 export default {
+  // Queue consumer: posts one edition per message. No retries, so a half-posted edition is never repeated.
+  async queue(batch, env) {
+    for (const msg of batch.messages) {
+      try {
+        await postEdition(env, msg.body.stories);
+      } catch (err) {
+        console.error('edition failed', err);
+      }
+      msg.ack();
+    }
+  },
+
   async fetch(request, env, ctx) {
     env = { ...env, ctx };
     const url = new URL(request.url);

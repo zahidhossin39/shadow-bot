@@ -13,3 +13,13 @@ NEWS_CHANNEL_ID = "1561489312032366692"
 
 [ai]
 binding = "AI"
+
+# Editions go through a queue: the consumer may run up to 15 minutes, enough for 10 audio clips.
+[[queues.producers]]
+binding = "EDITIONS"
+queue = "shadow-news-editions"
+
+[[queues.consumers]]
+queue = "shadow-news-editions"
+max_batch_size = 1
+max_retries = 0
