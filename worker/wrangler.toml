@@ -10,3 +10,6 @@ NEWS_CHANNEL_ID = "1561489312032366692"
 #   npx wrangler secret put DISCORD_TOKEN
 #   npx wrangler secret put PASSCODE
 #   npx wrangler secret put SIGNING_KEY
+
+[ai]
+binding = "AI"

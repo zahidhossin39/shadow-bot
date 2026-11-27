@@ -210,7 +210,55 @@ function parseEdition(text) {
   return stories.slice(0, 10);
 }
 
-async function postEdition(env, stories, title) {
+// ---------- audio summary ----------
+// A spoken recap (15-20 s) posted under the edition. Cloudflare Workers AI text-to-speech, no API key.
+const MAX_WORDS = 50; // ~44 words measured at 18.5 s with the luna voice
+
+/** Gemini's script, or a fallback built from the top 3 headlines; trimmed to fit 20 seconds. */
+function audioScript(script, stories) {
+  let text = (script ?? '').replace(/\s+/g, ' ').trim();
+  if (!text) {
+    const tops = stories.slice(0, 3).map((s) => s.headline).filter(Boolean);
+    if (!tops.length) return '';
+    text = `Here's today's tech news. ${tops.map((h) => h.replace(/[.!?]*$/, '.')).join(' ')} Full stories are above.`;
+  }
+  const words = text.split(' ');
+  if (words.length <= MAX_WORDS) return text;
+  // Too long: cut at the last full sentence that fits.
+  const cut = words.slice(0, MAX_WORDS).join(' ');
+  const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+  return end > 0 ? cut.slice(0, end + 1) : `${cut}.`;
+}
+
+async function speak(env, text) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const out = await env.AI.run('@cf/deepgram/aura-2-en', { text, speaker: 'luna', encoding: 'mp3' });
+      return await new Response(out).arrayBuffer();
+    } catch (err) {
+      console.error('tts failed', attempt, err.message);
+    }
+  }
+  return null;
+}
+
+async function postAudio(env, mp3) {
+  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date());
+  const form = new FormData();
+  form.append('payload_json', JSON.stringify({ content: '🎧 **Today in 20 seconds**', allowed_mentions: { parse: [] } }));
+  form.append('files[0]', new Blob([mp3], { type: 'audio/mpeg' }), `shadow-news-${date}.mp3`);
+  const res = await fetch(`https://discord.com/api/v10/channels/${env.NEWS_CHANNEL_ID}/messages`, {
+    method: 'POST',
+    headers: { authorization: `Bot ${env.DISCORD_TOKEN}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error(`Discord ${res.status}: ${await res.text()}`);
+}
+
+async function postEdition(env, stories, title, script) {
+  // Start the audio first: it takes ~13 s, so it runs while the pages are fetched and cards posted.
+  const text = audioScript(script, stories);
+  const audio = text ? speak(env, text) : Promise.resolve(null);
   const metas = await Promise.all(stories.map((s) => pageMeta(s.url)));
   await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { content: editionHeader(title || `Today's Top ${stories.length}`), allowed_mentions: { parse: [] } });
   for (const [i, s] of stories.entries()) {
@@ -227,6 +275,8 @@ async function postEdition(env, stories, title) {
     if (m.image) embed.image = { url: m.image };
     await discord(env, `/channels/${env.NEWS_CHANNEL_ID}/messages`, { embeds: [embed], allowed_mentions: { parse: [] } });
   }
+  const mp3 = await audio;
+  if (mp3) await postAudio(env, mp3);
 }
 
 // ---------- MCP ----------
@@ -276,14 +326,18 @@ function buildServer(env) {
         stories: z
           .string()
           .describe('One story per line, most important first, as: link | category | headline | why it matters. Category is one of ai, tech, security, creators, other.'),
+        // Required on purpose: with an optional field, Gemini failed before calling the tool (tested 2026-11-27).
+        audio_summary: z
+          .string()
+          .describe('A spoken recap of the top stories, 40 to 45 words (under 20 seconds read aloud). Plain sentences, no links or symbols.'),
       },
     },
-    async ({ stories: text }, extra) => {
+    async ({ stories: text, audio_summary: script }) => {
       const stories = parseEdition(text ?? '');
       console.log('post_edition called', stories.length, 'stories');
       if (!stories.length) return { content: [{ type: 'text', text: 'No stories found. Send one per line: link | category | headline | why it matters.' }], isError: true };
       // Post in the background so Gemini gets an answer right away.
-      env.ctx.waitUntil(postEdition(env, stories).catch((err) => console.error('post_edition failed', err)));
+      env.ctx.waitUntil(postEdition(env, stories, undefined, script).catch((err) => console.error('post_edition failed', err)));
       return { content: [{ type: 'text', text: `Posting ${stories.length} stories to Shadow Garden now.` }] };
     },
   );
