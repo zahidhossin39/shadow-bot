@@ -5,6 +5,8 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 NEWS_CHANNEL_ID = "1561489312032366692"
+# Role members get from the notifications channel; the edition header pings it.
+NEWS_PING_ROLE_ID = "1575888699466711060"
 
 # Secrets (never in this file), set with:
 #   npx wrangler secret put DISCORD_TOKEN

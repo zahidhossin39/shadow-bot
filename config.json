@@ -75,9 +75,9 @@
     "goodbyeLine": "Their shadow fades, but the garden remembers."
   },
   "pings": {
-    "channel": "",
+    "channel": "1575888702369173646",
     "options": [
-      { "key": "news", "label": "Daily News", "emoji": "📰", "roleName": "📰 News Pings", "description": "get pinged when the daily top 10 is posted (around 2:30 PM).", "role": "" }
+      { "key": "news", "label": "Daily News", "emoji": "📰", "roleName": "📰 News Pings", "description": "get pinged when the daily top 10 is posted (around 2:30 PM).", "role": "1575888699466711060" }
     ]
   }
 }
