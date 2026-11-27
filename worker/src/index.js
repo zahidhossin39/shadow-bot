@@ -303,6 +303,35 @@ async function postEdition(env, stories, title) {
   await making;
 }
 
+// ---------- no repeats ----------
+// Gemini doesn't remember earlier days, so the server does: each posted link and headline is
+// kept in KV for 14 days, and a story matching either is skipped.
+const REMEMBER_DAYS = 14;
+const urlKey = (u) => {
+  try {
+    const x = new URL(u);
+    return `u:${x.hostname.replace(/^www\./, '')}${x.pathname.replace(/\/+$/, '')}`.toLowerCase();
+  } catch {
+    return `u:${u}`;
+  }
+};
+const titleKey = (t) => (t ? `t:${t.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}` : null);
+
+async function dropRepeats(env, stories) {
+  const seen = await Promise.all(
+    stories.map(async (s) => (await env.POSTED.get(urlKey(s.url))) || (titleKey(s.headline) && (await env.POSTED.get(titleKey(s.headline))))),
+  );
+  return { fresh: stories.filter((_, i) => !seen[i]), repeats: stories.filter((_, i) => seen[i]) };
+}
+
+async function remember(env, stories) {
+  const opts = { expirationTtl: REMEMBER_DAYS * 86_400 };
+  const day = new Date().toISOString().slice(0, 10);
+  await Promise.all(
+    stories.flatMap((s) => [env.POSTED.put(urlKey(s.url), day, opts), titleKey(s.headline) && env.POSTED.put(titleKey(s.headline), day, opts)].filter(Boolean)),
+  );
+}
+
 // ---------- MCP ----------
 // Verified live in Gemini devmode: Gemini calls tools whose inputs are plain strings, but makes
 // only one custom-tool call per turn. So a whole edition goes in one call (post_edition), as short
@@ -357,13 +386,17 @@ function buildServer(env) {
       },
     },
     async ({ stories: text }) => {
-      const stories = parseEdition(text ?? '');
-      console.log('post_edition called', stories.length, 'stories');
-      if (!stories.length) return { content: [{ type: 'text', text: 'No stories found. Send one per line: link | category | headline | summary | why it matters.' }], isError: true };
+      const parsed = parseEdition(text ?? '');
+      console.log('post_edition called', parsed.length, 'stories');
+      if (!parsed.length) return { content: [{ type: 'text', text: 'No stories found. Send one per line: link | category | headline | summary | why it matters.' }], isError: true };
+      const { fresh: stories, repeats } = await dropRepeats(env, parsed);
+      if (!stories.length) return { content: [{ type: 'text', text: `All ${parsed.length} stories were already posted in the last 14 days. Pick newer stories.` }], isError: true };
       // Ten audio clips take ~2 minutes, more than a request may run in the background,
       // so the edition goes to a queue whose consumer can run for up to 15 minutes.
       await env.EDITIONS.send({ stories });
-      return { content: [{ type: 'text', text: `Posting ${stories.length} stories with audio to Shadow Garden now.` }] };
+      await remember(env, stories);
+      const skipped = repeats.length ? ` Skipped ${repeats.length} already posted: ${repeats.map((s) => s.headline || s.url).join('; ')}.` : '';
+      return { content: [{ type: 'text', text: `Posting ${stories.length} stories with audio to Shadow Garden now.${skipped}` }] };
     },
   );
   return server;

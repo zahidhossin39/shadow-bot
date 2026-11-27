@@ -25,3 +25,8 @@ queue = "shadow-news-editions"
 queue = "shadow-news-editions"
 max_batch_size = 1
 max_retries = 0
+
+# Remembers posted links and headlines for 14 days so a story is never posted twice.
+[[kv_namespaces]]
+binding = "POSTED"
+id = "0009ee6248e443c0bafc04b90aa062b0"
