@@ -217,7 +217,7 @@ function parseEdition(text) {
 // ---------- audio ----------
 // Each story gets its own spoken summary (15-20 s) right under its card.
 // Cloudflare Workers AI text-to-speech, no API key.
-const MAX_WORDS = 50; // 44 words measured at 18.5 s with the luna voice
+const MAX_WORDS = 46; // 44 words = 18.5 s (luna); 50 ran to 21.5 s in a real edition
 
 /** Trim to fit 20 seconds, cutting at the last full sentence. */
 function fitAudio(text) {
