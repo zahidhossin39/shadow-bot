@@ -43,7 +43,7 @@ client.once('clientReady', async () => {
         console.warn(`[${guild.name}] can't ping in #${ch.name}: bot lacks Send Messages there`);
       }
       if (option.role !== role.id) {
-        saveId(new RegExp(`("key": "${option.key}"[\\s\\S]*?"role": )"[^"]*"`), role.id);
+        saveId(new RegExp(`("key":\\s*"${option.key}"[^\\n]*?"role":\\s*)"[^"]*"`), role.id);
         option.role = role.id;
       }
     }

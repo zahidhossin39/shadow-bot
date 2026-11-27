@@ -78,19 +78,19 @@
     "channel": "1575888702369173646",
     "options": [
       {"key":"news","label":"Daily News","emoji":"📰","roleName":"📰 News Pings","channel":"1561489312032366692","description":"the daily top 10 with audio (around 2:30 PM).","cooldownMinutes":30,"role":"1575888699466711060","watch":false},
-      {"key":"announcements","label":"Announcements","emoji":"📢","roleName":"📢 Announcements Pings","channel":"1526803753737523292","description":"server announcements.","cooldownMinutes":0,"role":""},
-      {"key":"chat","label":"Chat Room","emoji":"🍿","roleName":"🍿 Chat Room Pings","channel":"1303029398685089825","description":"when the chat room gets active (max once every 3 hours).","cooldownMinutes":180,"role":""},
-      {"key":"memes","label":"Memes","emoji":"👀","roleName":"👀 Memes Pings","channel":"1522983841692647576","description":"new memes.","cooldownMinutes":30,"role":""},
-      {"key":"gallery","label":"Gallery","emoji":"📸","roleName":"📸 Gallery Pings","channel":"1528577722815746169","description":"new gallery posts.","cooldownMinutes":30,"role":""},
-      {"key":"achievements","label":"Achievements","emoji":"🔥","roleName":"🔥 Achievements Pings","channel":"1553592724639453275","description":"when someone shares an achievement.","cooldownMinutes":30,"role":""},
-      {"key":"intros","label":"Introductions","emoji":"🆔","roleName":"🆔 Introductions Pings","channel":"1525170918383681688","description":"when a new member introduces themselves.","cooldownMinutes":30,"role":""},
-      {"key":"video-insights","label":"Video Insights","emoji":"📽️","roleName":"📽️ Video Insights Pings","channel":"1544444113175314603","description":"new video insights.","cooldownMinutes":30,"role":""},
-      {"key":"insight-clips","label":"Insight Clips","emoji":"🧠","roleName":"🧠 Insight Clips Pings","channel":"1544444872763908137","description":"new insight clips.","cooldownMinutes":30,"role":""},
-      {"key":"tools","label":"Tools","emoji":"🛠️","roleName":"🛠️ Tools Pings","channel":"1561488178521579590","description":"new tools shared.","cooldownMinutes":30,"role":""},
-      {"key":"hackathons","label":"Hackathons","emoji":"🛰️","roleName":"🛰️ Hackathons Pings","channel":"1568707425534480464","description":"hackathon launches and updates.","cooldownMinutes":30,"role":""},
-      {"key":"guides","label":"Guides","emoji":"📖","roleName":"📖 Guides Pings","channel":"1561488726746599564","description":"new guides and tutorials.","cooldownMinutes":30,"role":""},
-      {"key":"design-assets","label":"Design Assets","emoji":"🎨","roleName":"🎨 Design Assets Pings","channel":"1561488827842035742","description":"new design assets.","cooldownMinutes":30,"role":""},
-      {"key":"ideas","label":"Ideas","emoji":"💡","roleName":"💡 Ideas Pings","channel":"1561489504534139023","description":"new ideas posted.","cooldownMinutes":30,"role":""}
+      {"key":"announcements","label":"Announcements","emoji":"📢","roleName":"📢 Announcements Pings","channel":"1526803753737523292","description":"server announcements.","cooldownMinutes":0,"role":"1575896572468797620"},
+      {"key":"chat","label":"Chat Room","emoji":"🍿","roleName":"🍿 Chat Room Pings","channel":"1303029398685089825","description":"when the chat room gets active (max once every 3 hours).","cooldownMinutes":180,"role":"1575896639745429514"},
+      {"key":"memes","label":"Memes","emoji":"👀","roleName":"👀 Memes Pings","channel":"1522983841692647576","description":"new memes.","cooldownMinutes":30,"role":"1575896642916319303"},
+      {"key":"gallery","label":"Gallery","emoji":"📸","roleName":"📸 Gallery Pings","channel":"1528577722815746169","description":"new gallery posts.","cooldownMinutes":30,"role":"1575896645134979154"},
+      {"key":"achievements","label":"Achievements","emoji":"🔥","roleName":"🔥 Achievements Pings","channel":"1553592724639453275","description":"when someone shares an achievement.","cooldownMinutes":30,"role":"1575896647618138152"},
+      {"key":"intros","label":"Introductions","emoji":"🆔","roleName":"🆔 Introductions Pings","channel":"1525170918383681688","description":"when a new member introduces themselves.","cooldownMinutes":30,"role":"1575896650126463138"},
+      {"key":"video-insights","label":"Video Insights","emoji":"📽️","roleName":"📽️ Video Insights Pings","channel":"1544444113175314603","description":"new video insights.","cooldownMinutes":30,"role":"1575896652605034598"},
+      {"key":"insight-clips","label":"Insight Clips","emoji":"🧠","roleName":"🧠 Insight Clips Pings","channel":"1544444872763908137","description":"new insight clips.","cooldownMinutes":30,"role":"1575896655285190777"},
+      {"key":"tools","label":"Tools","emoji":"🛠️","roleName":"🛠️ Tools Pings","channel":"1561488178521579590","description":"new tools shared.","cooldownMinutes":30,"role":"1575896657785127002"},
+      {"key":"hackathons","label":"Hackathons","emoji":"🛰️","roleName":"🛰️ Hackathons Pings","channel":"1568707425534480464","description":"hackathon launches and updates.","cooldownMinutes":30,"role":"1575896660029218829"},
+      {"key":"guides","label":"Guides","emoji":"📖","roleName":"📖 Guides Pings","channel":"1561488726746599564","description":"new guides and tutorials.","cooldownMinutes":30,"role":"1575896663611150418"},
+      {"key":"design-assets","label":"Design Assets","emoji":"🎨","roleName":"🎨 Design Assets Pings","channel":"1561488827842035742","description":"new design assets.","cooldownMinutes":30,"role":"1575896665926144090"},
+      {"key":"ideas","label":"Ideas","emoji":"💡","roleName":"💡 Ideas Pings","channel":"1561489504534139023","description":"new ideas posted.","cooldownMinutes":30,"role":"1575896668296183869"}
     ]
   }
 }
